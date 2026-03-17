@@ -4,11 +4,49 @@ name: Deploy - Production
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: "Skip migrations"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
+  migrate-prod:
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event.inputs.skip_migrations != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          cd sagun-moldify-api
+          npm ci
+
+      - name: Run Database Migrations
+        run: |
+          cd sagun-moldify-api
+          npm run migration:run
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+
   deploy-prod:
     runs-on: ubuntu-latest
     environment: production
+    needs: migrate-prod
 
     steps:
       - name: Checkout code

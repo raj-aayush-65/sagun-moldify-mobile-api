@@ -4,11 +4,39 @@ name: Deploy - Beta
 on:
   push:
     branches: [dev]
+  workflow_dispatch:
 
 jobs:
+  migrate-beta:
+    runs-on: ubuntu-latest
+    environment: beta
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          cd sagun-moldify-api
+          npm ci
+
+      - name: Run Database Migrations
+        run: |
+          cd sagun-moldify-api
+          npm run migration:run
+        env:
+          NODE_ENV: beta
+          DATABASE_URL: ${{ secrets.DATABASE_URL_BETA }}
+
   deploy-beta:
     runs-on: ubuntu-latest
     environment: beta
+    needs: migrate-beta
 
     steps:
       - name: Checkout code

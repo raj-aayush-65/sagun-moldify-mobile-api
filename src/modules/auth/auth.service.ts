@@ -71,17 +71,37 @@ export class AuthService {
       throw new ConflictException("Email already exists");
     }
 
-    // Determine role and permissions
+    // Determine role and permissions based on environment
     let role = signupDto.role || UserRole.EMPLOYEE;
     let isSuperAdmin = false;
 
+    // Check the current environment
+    const nodeEnv = process.env.NODE_ENV || "development";
+    const isProduction = nodeEnv === "production";
+    const isBeta = nodeEnv === "beta";
+    const isDevelopment = nodeEnv === "development";
+
     // Check if trying to create SUPER_ADMIN
     if (role === UserRole.SUPER_ADMIN) {
-      // Allow only in local development environment
-      const isLocalEnv = process.env.NODE_ENV === "development";
-      if (!isLocalEnv) {
-        throw new ConflictException("Cannot create SUPER_ADMIN role");
+      // Allow in development and beta, block in production
+      if (isProduction) {
+        throw new ConflictException(
+          "Cannot create SUPER_ADMIN in production environment. Contact system administrator.",
+        );
       }
+
+      // In beta, warn but allow for initial setup
+      if (isBeta) {
+        console.warn(
+          "⚠️ Creating SUPER_ADMIN in Beta environment - this should only be used for initial setup",
+        );
+      }
+
+      // In development, always allow
+      if (isDevelopment) {
+        console.warn("⚠️ Creating SUPER_ADMIN in Development environment");
+      }
+
       isSuperAdmin = true;
     }
 
@@ -95,7 +115,14 @@ export class AuthService {
         // Only Super Admin can create Super User
         if (role === UserRole.SUPER_USER && !creator.isSuperAdmin) {
           throw new UnauthorizedException(
-            "Not authorized to create SUPER_USER",
+            "Not authorized to create SUPER_USER role",
+          );
+        }
+
+        // Check if creator can create the requested role
+        if (!this.canCreatorCreateRole(creator.role, role)) {
+          throw new UnauthorizedException(
+            `Not authorized to create ${role} role`,
           );
         }
       }
@@ -122,6 +149,27 @@ export class AuthService {
       message: "User created successfully",
       user: result,
     };
+  }
+
+  /**
+   * Check if a creator can create users with a specific role
+   */
+  private canCreatorCreateRole(
+    creatorRole: UserRole,
+    targetRole: UserRole,
+  ): boolean {
+    const roleHierarchy: Record<UserRole, UserRole[]> = {
+      [UserRole.SUPER_ADMIN]: [
+        UserRole.SUPER_USER,
+        UserRole.HIGHER_OPS,
+        UserRole.EMPLOYEE,
+      ],
+      [UserRole.SUPER_USER]: [UserRole.HIGHER_OPS, UserRole.EMPLOYEE],
+      [UserRole.HIGHER_OPS]: [UserRole.EMPLOYEE],
+      [UserRole.EMPLOYEE]: [],
+    };
+
+    return roleHierarchy[creatorRole]?.includes(targetRole) ?? false;
   }
 
   async refreshToken(user: User) {
