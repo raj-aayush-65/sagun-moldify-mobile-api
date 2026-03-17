@@ -27,7 +27,9 @@ import { HealthModule } from "./modules/health/health.module";
             ? { rejectUnauthorized: false }
             : false,
           entities: [__dirname + "/**/*.entity{.ts,.js}"],
-          synchronize: false, // Use migrations instead
+          migrations: [__dirname + "/migrations/*{.ts,.js}"],
+          synchronize: false,
+          migrationsRun: true, // Auto-run migrations on startup
           logging: configService.get<string>("NODE_ENV") === "development",
         };
       },
