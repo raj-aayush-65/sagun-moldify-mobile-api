@@ -2,22 +2,23 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
-} from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import * as bcrypt from "bcrypt";
-import { User } from "../users/entities/user.entity";
-import { LoginDto } from "./dto/login.dto";
-import { SignupDto } from "./dto/signup.dto";
-import { UserRole } from "../../common/enums/user-role.enum";
+  ForbiddenException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { User } from '../users/entities/user.entity';
+import { LoginDto } from './dto/login.dto';
+import { SignupDto } from './dto/signup.dto';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-    private jwtService: JwtService,
+    private jwtService: JwtService
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -34,11 +35,11 @@ export class AuthService {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException("Account is disabled");
+      throw new UnauthorizedException('Account is disabled');
     }
 
     const payload = {
@@ -50,7 +51,7 @@ export class AuthService {
 
     return {
       accessToken: this.jwtService.sign(payload),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: "7d" }),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
       user: {
         id: user.id,
         email: user.email,
@@ -68,38 +69,38 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException("Email already exists");
+      throw new ConflictException('Email already exists');
     }
 
     // Determine role and permissions based on environment
-    let role = signupDto.role || UserRole.EMPLOYEE;
+    const role = signupDto.role || UserRole.EMPLOYEE;
     let isSuperAdmin = false;
 
     // Check the current environment
-    const nodeEnv = process.env.NODE_ENV || "development";
-    const isProduction = nodeEnv === "production";
-    const isBeta = nodeEnv === "beta";
-    const isDevelopment = nodeEnv === "development";
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const isProduction = nodeEnv === 'production';
+    const isBeta = nodeEnv === 'beta';
+    const isDevelopment = nodeEnv === 'development';
 
     // Check if trying to create SUPER_ADMIN
     if (role === UserRole.SUPER_ADMIN) {
       // Allow in development and beta, block in production
       if (isProduction) {
         throw new ConflictException(
-          "Cannot create SUPER_ADMIN in production environment. Contact system administrator.",
+          'Cannot create SUPER_ADMIN in production environment. Contact system administrator.'
         );
       }
 
       // In beta, warn but allow for initial setup
       if (isBeta) {
         console.warn(
-          "⚠️ Creating SUPER_ADMIN in Beta environment - this should only be used for initial setup",
+          '⚠️ Creating SUPER_ADMIN in Beta environment - this should only be used for initial setup'
         );
       }
 
       // In development, always allow
       if (isDevelopment) {
-        console.warn("⚠️ Creating SUPER_ADMIN in Development environment");
+        console.warn('⚠️ Creating SUPER_ADMIN in Development environment');
       }
 
       isSuperAdmin = true;
@@ -114,16 +115,12 @@ export class AuthService {
       if (creator) {
         // Only Super Admin can create Super User
         if (role === UserRole.SUPER_USER && !creator.isSuperAdmin) {
-          throw new UnauthorizedException(
-            "Not authorized to create SUPER_USER role",
-          );
+          throw new UnauthorizedException('Not authorized to create SUPER_USER role');
         }
 
         // Check if creator can create the requested role
         if (!this.canCreatorCreateRole(creator.role, role)) {
-          throw new UnauthorizedException(
-            `Not authorized to create ${role} role`,
-          );
+          throw new UnauthorizedException(`Not authorized to create ${role} role`);
         }
       }
     }
@@ -143,10 +140,10 @@ export class AuthService {
 
     await this.usersRepository.save(user);
 
-    const { passwordHash: _, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
 
     return {
-      message: "User created successfully",
+      message: 'User created successfully',
       user: result,
     };
   }
@@ -154,22 +151,76 @@ export class AuthService {
   /**
    * Check if a creator can create users with a specific role
    */
-  private canCreatorCreateRole(
-    creatorRole: UserRole,
-    targetRole: UserRole,
-  ): boolean {
+  private canCreatorCreateRole(creatorRole: UserRole, targetRole: UserRole): boolean {
     const roleHierarchy: Record<UserRole, UserRole[]> = {
-      [UserRole.SUPER_ADMIN]: [
-        UserRole.SUPER_USER,
-        UserRole.HIGHER_OPS,
-        UserRole.EMPLOYEE,
-      ],
+      [UserRole.SUPER_ADMIN]: [UserRole.SUPER_USER, UserRole.HIGHER_OPS, UserRole.EMPLOYEE],
       [UserRole.SUPER_USER]: [UserRole.HIGHER_OPS, UserRole.EMPLOYEE],
       [UserRole.HIGHER_OPS]: [UserRole.EMPLOYEE],
       [UserRole.EMPLOYEE]: [],
     };
 
     return roleHierarchy[creatorRole]?.includes(targetRole) ?? false;
+  }
+
+  /**
+   * Admin Seed - Create first Super Admin
+   * Only works when no users exist in the system
+   */
+  async adminSeed(body: { email: string; password: string; firstName: string; seedToken: string }) {
+    // Validate seed token from environment
+    const expectedToken = process.env.SEED_TOKEN;
+
+    if (!expectedToken) {
+      throw new ForbiddenException('Seed token not configured on server');
+    }
+
+    if (body.seedToken !== expectedToken) {
+      throw new UnauthorizedException('Invalid seed token');
+    }
+
+    // Check if any users exist
+    const userCount = await this.usersRepository.count();
+
+    if (userCount > 0) {
+      throw new ConflictException(
+        'Cannot seed - users already exist. Use regular user creation instead.'
+      );
+    }
+
+    // Create Super Admin
+    const passwordHash = await bcrypt.hash(body.password, 10);
+
+    const user = this.usersRepository.create({
+      email: body.email,
+      passwordHash,
+      firstName: body.firstName,
+      role: UserRole.SUPER_ADMIN,
+      isSuperAdmin: true,
+      isActive: true,
+    });
+
+    await this.usersRepository.save(user);
+
+    // Generate tokens
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
+    };
+
+    return {
+      message: 'Super Admin created successfully',
+      accessToken: this.jwtService.sign(payload),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin,
+      },
+    };
   }
 
   async refreshToken(user: User) {
@@ -182,7 +233,7 @@ export class AuthService {
 
     return {
       accessToken: this.jwtService.sign(payload),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: "7d" }),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
     };
   }
 }

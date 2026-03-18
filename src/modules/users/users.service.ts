@@ -3,12 +3,12 @@ import {
   NotFoundException,
   ConflictException,
   UnauthorizedException,
-} from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import * as bcrypt from "bcrypt";
-import { User } from "./entities/user.entity";
-import { UserRole } from "../../common/enums/user-role.enum";
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { User } from './entities/user.entity';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 interface CreateUserDto {
   email: string;
@@ -16,7 +16,7 @@ interface CreateUserDto {
   firstName: string;
   lastName?: string;
   phone?: string;
-  role: UserRole;
+  role?: UserRole; // Optional - for Super Admin creating Super Admin
 }
 
 interface UpdateUserDto {
@@ -31,21 +31,21 @@ interface UpdateUserDto {
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    private usersRepository: Repository<User>
   ) {}
 
   async findAll(): Promise<User[]> {
     return this.usersRepository.find({
       select: [
-        "id",
-        "email",
-        "firstName",
-        "lastName",
-        "phone",
-        "role",
-        "isActive",
-        "isSuperAdmin",
-        "createdAt",
+        'id',
+        'email',
+        'firstName',
+        'lastName',
+        'phone',
+        'role',
+        'isActive',
+        'isSuperAdmin',
+        'createdAt',
       ],
     });
   }
@@ -70,6 +70,7 @@ export class UsersService {
 
   /**
    * Create a new user (used by Super Admin/Super User)
+   * Role is determined server-side based on creator's permissions
    */
   async create(createUserDto: CreateUserDto, creatorId: string): Promise<User> {
     const existingUser = await this.usersRepository.findOne({
@@ -77,7 +78,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new ConflictException("Email already exists");
+      throw new ConflictException('Email already exists');
     }
 
     // Get creator to check permissions
@@ -86,28 +87,36 @@ export class UsersService {
     });
 
     if (!creator) {
-      throw new UnauthorizedException("Creator not found");
+      throw new UnauthorizedException('Creator not found');
     }
 
-    // Check if creator can create this role
-    const targetRole = createUserDto.role;
+    // Determine target role server-side
+    let targetRole: UserRole;
 
-    if (targetRole === UserRole.SUPER_ADMIN) {
-      throw new ConflictException(
-        "Cannot create SUPER_ADMIN through this endpoint",
-      );
+    // If creator is Super Admin and explicitly wants to create Super Admin
+    if (createUserDto.role === UserRole.SUPER_ADMIN && creator.isSuperAdmin) {
+      targetRole = UserRole.SUPER_ADMIN;
+    } else if (createUserDto.role === UserRole.SUPER_ADMIN) {
+      // Non-Super Admin trying to create Super Admin
+      throw new UnauthorizedException('Not authorized to create SUPER_ADMIN');
+    } else if (creator.isSuperAdmin) {
+      // Super Admin can create Super User, HigherOps, or Employee
+      // Default to SUPER_USER for Super Admins, or use requested role
+      targetRole = createUserDto.role || UserRole.SUPER_USER;
+    } else if (creator.role === UserRole.SUPER_USER) {
+      // Super User can create HigherOps or Employee
+      targetRole = createUserDto.role || UserRole.HIGHER_OPS;
+    } else if (creator.role === UserRole.HIGHER_OPS) {
+      // HigherOps can only create Employee
+      targetRole = UserRole.EMPLOYEE;
+    } else {
+      // Employee cannot create users
+      throw new UnauthorizedException('Not authorized to create users');
     }
 
-    // Only Super Admin can create Super User
-    if (targetRole === UserRole.SUPER_USER && !creator.isSuperAdmin) {
-      throw new UnauthorizedException("Not authorized to create SUPER_USER");
-    }
-
-    // Check role hierarchy
-    if (!this.canCreatorCreateRole(creator.role, targetRole)) {
-      throw new UnauthorizedException(
-        `Not authorized to create ${targetRole} role`,
-      );
+    // Verify the creator can actually create this role
+    if (!this.canCreatorCreateRole(creator.role, targetRole) && !creator.isSuperAdmin) {
+      throw new UnauthorizedException(`Not authorized to create ${targetRole} role`);
     }
 
     const passwordHash = await bcrypt.hash(createUserDto.password, 10);
@@ -119,13 +128,13 @@ export class UsersService {
       lastName: createUserDto.lastName,
       phone: createUserDto.phone,
       role: targetRole,
-      isSuperAdmin: false,
+      isSuperAdmin: targetRole === UserRole.SUPER_ADMIN,
       createdBy: creatorId,
     });
 
     await this.usersRepository.save(user);
 
-    const { passwordHash: _, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
     return result as User;
   }
 
@@ -143,7 +152,7 @@ export class UsersService {
 
     // Cannot modify Super Admin
     if (user.isSuperAdmin) {
-      throw new UnauthorizedException("Cannot modify Super Admin");
+      throw new UnauthorizedException('Cannot modify Super Admin');
     }
 
     // Update allowed fields
@@ -165,7 +174,7 @@ export class UsersService {
 
     await this.usersRepository.save(user);
 
-    const { passwordHash: _, ...result } = user;
+    const { passwordHash: _passwordHash2, ...result } = user;
     return result as User;
   }
 
@@ -183,28 +192,21 @@ export class UsersService {
 
     // Cannot deactivate Super Admin
     if (user.isSuperAdmin) {
-      throw new UnauthorizedException("Cannot deactivate Super Admin");
+      throw new UnauthorizedException('Cannot deactivate Super Admin');
     }
 
     user.isActive = false;
     await this.usersRepository.save(user);
 
-    return { message: "User deactivated successfully" };
+    return { message: 'User deactivated successfully' };
   }
 
   /**
    * Check if a creator can create users with a specific role
    */
-  private canCreatorCreateRole(
-    creatorRole: UserRole,
-    targetRole: UserRole,
-  ): boolean {
+  private canCreatorCreateRole(creatorRole: UserRole, targetRole: UserRole): boolean {
     const roleHierarchy: Record<UserRole, UserRole[]> = {
-      [UserRole.SUPER_ADMIN]: [
-        UserRole.SUPER_USER,
-        UserRole.HIGHER_OPS,
-        UserRole.EMPLOYEE,
-      ],
+      [UserRole.SUPER_ADMIN]: [UserRole.SUPER_USER, UserRole.HIGHER_OPS, UserRole.EMPLOYEE],
       [UserRole.SUPER_USER]: [UserRole.HIGHER_OPS, UserRole.EMPLOYEE],
       [UserRole.HIGHER_OPS]: [UserRole.EMPLOYEE],
       [UserRole.EMPLOYEE]: [],

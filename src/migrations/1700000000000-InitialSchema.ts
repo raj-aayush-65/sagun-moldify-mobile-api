@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class InitialSchema1700000000000 implements MigrationInterface {
-  name = "InitialSchema1700000000000";
+  name = 'InitialSchema1700000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create user_role enum type
@@ -53,12 +53,8 @@ export class InitialSchema1700000000000 implements MigrationInterface {
     `);
 
     // Create indexes
-    await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_users_email" ON "users"("email");`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_users_role" ON "users"("role");`,
-    );
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_users_email" ON "users"("email");`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_users_role" ON "users"("role");`);
 
     // Create role_permissions table
     await queryRunner.query(`
@@ -75,7 +71,7 @@ export class InitialSchema1700000000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_role_permissions_role" ON "role_permissions"("role");`,
+      `CREATE INDEX IF NOT EXISTS "idx_role_permissions_role" ON "role_permissions"("role");`
     );
 
     // Insert SUPER_ADMIN permissions
@@ -190,7 +186,7 @@ export class InitialSchema1700000000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_refresh_tokens_user_id" ON "refresh_tokens"("user_id");`,
+      `CREATE INDEX IF NOT EXISTS "idx_refresh_tokens_user_id" ON "refresh_tokens"("user_id");`
     );
 
     // Create audit_logs table
@@ -208,10 +204,10 @@ export class InitialSchema1700000000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_audit_logs_user_id" ON "audit_logs"("user_id");`,
+      `CREATE INDEX IF NOT EXISTS "idx_audit_logs_user_id" ON "audit_logs"("user_id");`
     );
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_audit_logs_created_at" ON "audit_logs"("created_at");`,
+      `CREATE INDEX IF NOT EXISTS "idx_audit_logs_created_at" ON "audit_logs"("created_at");`
     );
   }
 

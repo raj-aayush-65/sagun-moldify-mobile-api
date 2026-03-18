@@ -1,16 +1,16 @@
-import { Module } from "@nestjs/common";
-import { ConfigModule, ConfigService } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { AuthModule } from "./modules/auth/auth.module";
-import { UsersModule } from "./modules/users/users.module";
-import { HealthModule } from "./modules/health/health.module";
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
     // Config Module - loads .env file
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [".env", ".env.beta", ".env.prod"],
+      envFilePath: ['.env', '.env.beta', '.env.prod'],
     }),
 
     // TypeORM Configuration using DATABASE_URL
@@ -18,19 +18,18 @@ import { HealthModule } from "./modules/health/health.module";
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const databaseUrl = configService.get<string>("DATABASE_URL");
+        const databaseUrl = configService.get<string>('DATABASE_URL');
 
         return {
-          type: "postgres",
+          type: 'postgres',
           url: databaseUrl,
-          ssl: databaseUrl?.includes("sslmode=require")
-            ? { rejectUnauthorized: false }
-            : false,
-          entities: [__dirname + "/**/*.entity{.ts,.js}"],
-          migrations: [__dirname + "/migrations/*{.ts,.js}"],
+          ssl: databaseUrl?.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          migrations: [__dirname + '/migrations/*{.ts,.js}'],
           synchronize: false,
           migrationsRun: true, // Auto-run migrations on startup
-          logging: configService.get<string>("NODE_ENV") === "development",
+          // Enable migration and schema logging
+          logging: ['migration', 'schema', 'warn', 'error', 'log'],
         };
       },
     }),
