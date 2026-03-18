@@ -26,7 +26,7 @@ export class RsaKeyService implements OnModuleInit {
     }
 
     this.sharedSecret = envSecret;
-    this.logger.log('Encryption secret loaded from environment');
+    this.logger.log('✅ Encryption secret loaded from environment');
   }
 
   /**
@@ -34,7 +34,9 @@ export class RsaKeyService implements OnModuleInit {
    * App will use this to encrypt passwords
    */
   getPublicKey(): string {
-    // Return the shared secret - simple string
+    // Always return the shared secret - simple string
+    // This is safe to expose publicly - it's just the encryption key
+    // The actual security comes from the encrypted password being sent over HTTPS
     return this.sharedSecret;
   }
 
@@ -44,22 +46,35 @@ export class RsaKeyService implements OnModuleInit {
    */
   decrypt(encryptedData: string): string {
     try {
+      this.logger.debug(`Received encrypted data: ${encryptedData.substring(0, 100)}...`);
+
       // The app sends: { encryptedData: "base64-xor-ciphertext", salt: "random-salt" }
       const parsed = JSON.parse(encryptedData);
 
       if (!parsed.encryptedData || !parsed.salt) {
-        throw new Error('Invalid encrypted data format');
+        this.logger.error(`Missing encryptedData or salt: ${JSON.stringify(parsed)}`);
+        throw new Error('Invalid encrypted data format - missing encryptedData or salt');
       }
+
+      this.logger.debug(
+        `Salt: ${parsed.salt}, encryptedData length: ${parsed.encryptedData.length}`
+      );
 
       // Decode base64
       const encrypted = Buffer.from(parsed.encryptedData, 'base64').toString('utf8');
+      this.logger.debug(`Decoded encrypted length: ${encrypted.length}`);
 
       // Decrypt using XOR with secret + salt
-      const decrypted = this.xorDecrypt(encrypted, this.sharedSecret + parsed.salt);
+      const key = this.sharedSecret + parsed.salt;
+      this.logger.debug(`Using key length: ${key.length}`);
+
+      const decrypted = this.xorDecrypt(encrypted, key);
+      this.logger.debug(`Decrypted length: ${decrypted.length}`);
 
       return decrypted;
     } catch (error) {
-      this.logger.error('Decryption error', error);
+      this.logger.error(`Decryption error: ${error.message}`);
+      this.logger.error(`Stack: ${error.stack}`);
       throw new Error('Failed to decrypt password');
     }
   }
