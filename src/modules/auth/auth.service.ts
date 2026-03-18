@@ -12,19 +12,44 @@ import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { RsaKeyService } from './rsa.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private rsaKeyService: RsaKeyService
   ) {}
+
+  /**
+   * Decrypt password if encrypted, otherwise use as-is
+   */
+  private decryptPassword(password: string): string {
+    try {
+      // Try to parse as encrypted data (JSON format from client)
+      const parsed = JSON.parse(password);
+      if (parsed.encryptedData && parsed.salt) {
+        // Decrypt using RSA private key
+        const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
+        // Combine with salt to get original password
+        // Note: This is a simplified version
+        return decrypted + parsed.salt;
+      }
+    } catch {
+      // Not encrypted, use as-is
+    }
+    return password;
+  }
 
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.usersRepository.findOne({ where: { email } });
 
-    if (user && (await bcrypt.compare(password, user.passwordHash))) {
+    // Decrypt password if encrypted
+    const decryptedPassword = this.decryptPassword(password);
+
+    if (user && (await bcrypt.compare(decryptedPassword, user.passwordHash))) {
       return user;
     }
 
@@ -59,6 +84,7 @@ export class AuthService {
         lastName: user.lastName,
         role: user.role,
         isSuperAdmin: user.isSuperAdmin,
+        isActive: user.isActive,
       },
     };
   }
@@ -125,7 +151,10 @@ export class AuthService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(signupDto.password, 10);
+    // Decrypt password if encrypted
+    const decryptedPassword = this.decryptPassword(signupDto.password);
+
+    const passwordHash = await bcrypt.hash(decryptedPassword, 10);
 
     const user = this.usersRepository.create({
       email: signupDto.email,
@@ -135,6 +164,7 @@ export class AuthService {
       phone: signupDto.phone,
       role,
       isSuperAdmin,
+      isActive: true,
       createdBy: creatorId,
     });
 

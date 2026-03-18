@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { RsaKeyService } from '../auth/rsa.service';
 
 interface CreateUserDto {
   email: string;
@@ -31,8 +32,25 @@ interface UpdateUserDto {
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>
+    private usersRepository: Repository<User>,
+    private rsaKeyService: RsaKeyService
   ) {}
+
+  /**
+   * Decrypt password if encrypted
+   */
+  private decryptPassword(password: string): string {
+    try {
+      const parsed = JSON.parse(password);
+      if (parsed.encryptedData && parsed.salt) {
+        const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
+        return decrypted + parsed.salt;
+      }
+    } catch (error) {
+      // Not encrypted, use as-is
+    }
+    return password;
+  }
 
   async findAll(): Promise<User[]> {
     return this.usersRepository.find({
@@ -119,7 +137,8 @@ export class UsersService {
       throw new UnauthorizedException(`Not authorized to create ${targetRole} role`);
     }
 
-    const passwordHash = await bcrypt.hash(createUserDto.password, 10);
+    const decryptedPassword = this.decryptPassword(createUserDto.password);
+    const passwordHash = await bcrypt.hash(decryptedPassword, 10);
 
     const user = this.usersRepository.create({
       email: createUserDto.email,
@@ -129,6 +148,7 @@ export class UsersService {
       phone: createUserDto.phone,
       role: targetRole,
       isSuperAdmin: targetRole === UserRole.SUPER_ADMIN,
+      isActive: true,
       createdBy: creatorId,
     });
 

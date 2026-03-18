@@ -13,11 +13,23 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RsaKeyService } from './rsa.service';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly rsaKeyService: RsaKeyService
+  ) {}
+
+  @Get('public-key')
+  @ApiOperation({ summary: 'Get public key for password encryption' })
+  getPublicKey() {
+    return {
+      publicKey: this.rsaKeyService.getPublicKey(),
+    };
+  }
 
   @Post('login')
   @ApiOperation({ summary: 'User login' })
