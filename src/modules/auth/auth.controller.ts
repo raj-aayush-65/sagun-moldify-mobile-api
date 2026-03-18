@@ -31,9 +31,9 @@ export class AuthController {
   @Get('public-key')
   @ApiOperation({ summary: 'Get public key for password encryption' })
   getPublicKey() {
-    return {
+    return ApiResponseDto.success('Public key retrieved', {
       publicKey: this.rsaKeyService.getPublicKey(),
-    };
+    });
   }
 
   @Post('login')

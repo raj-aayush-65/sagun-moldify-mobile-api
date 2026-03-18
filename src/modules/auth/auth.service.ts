@@ -27,8 +27,8 @@ export class AuthService {
   ) {}
 
   /**
-   * Decrypt password if encrypted, otherwise use as-is
-   * The app encrypts passwords using RSA-OAEP with the public key
+   * Decrypt password - MUST be encrypted
+   * SECURITY: Rejects plain passwords to enforce encryption
    */
   private decryptPassword(password: string): string {
     // Check if it looks like encrypted JSON format
@@ -42,11 +42,15 @@ export class AuthService {
           return decrypted + parsed.salt;
         }
       } catch (error) {
-        this.logger.warn(`Failed to decrypt password: ${error.message}`);
+        this.logger.error(`Failed to decrypt password: ${error.message}`);
+        throw new UnauthorizedException('Password decryption failed - invalid encrypted data');
       }
     }
-    // Plain password - use as-is
-    return password;
+
+    // SECURITY: Plain passwords are NOT allowed
+    // This enforces end-to-end encryption
+    this.logger.error('Plain password received - encryption is required');
+    throw new UnauthorizedException('Password must be encrypted. Please update your app.');
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {

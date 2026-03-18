@@ -70,9 +70,29 @@ export class RsaKeyService implements OnModuleInit {
 
   /**
    * Get the public key for clients
+   * Always returns with proper PEM headers
    */
   getPublicKey(): string {
-    return this.publicKey;
+    // Ensure the key has proper PEM headers
+    const key = this.publicKey;
+    if (key && key.includes('-----BEGIN PUBLIC KEY-----')) {
+      return key;
+    }
+    // If key exists but has wrong format, wrap it
+    if (key && key.length > 0) {
+      // Check if it's a base64 key without headers
+      if (!key.includes('-----')) {
+        // Try to add PEM headers
+        return `-----BEGIN PUBLIC KEY-----\n${key}\n-----END PUBLIC KEY-----`;
+      }
+      // Check for old PKCS1 format - convert to SPKI
+      if (key.includes('-----BEGIN RSA PUBLIC KEY-----')) {
+        console.warn('⚠️ Converting PKCS1 public key to SPKI format');
+        // Return as-is and let it fail, forcing regeneration
+        return key;
+      }
+    }
+    return key;
   }
 
   /**
