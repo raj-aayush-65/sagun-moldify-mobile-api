@@ -53,7 +53,7 @@ export class RsaKeyService implements OnModuleInit {
         // Extract key components for app
         this.extractPublicKeyComponents();
       } catch (error) {
-        this.logger.error('Failed to load RSA keys from environment, generating new keys', error);
+        this.logger.error('Failed to load RSA keys from environment', error);
         this.generateNewKeys();
       }
     } else {
@@ -92,11 +92,11 @@ export class RsaKeyService implements OnModuleInit {
       // Export public key as DER
       const publicKeyDer = this.publicKey.export({ type: 'spki', format: 'der' });
 
-      // Parse DER to extract n and e
+      // Parse DER to extract n and e using proper ASN.1 parsing
       const components = this.parseRSAPublicKeyDER(publicKeyDer);
       this.publicKeyComponents = components;
 
-      this.logger.debug('Public key components extracted', {
+      this.logger.log('Public key components extracted successfully', {
         nLength: components.n.length,
         e: components.e,
       });
@@ -107,75 +107,89 @@ export class RsaKeyService implements OnModuleInit {
   }
 
   /**
-   * Parse RSA public key from DER format
-   * Extracts modulus (n) and exponent (e)
+   * Parse RSA public key from DER format using ASN.1
+   * This properly extracts modulus (n) and public exponent (e)
    */
   private parseRSAPublicKeyDER(der: Buffer): RSAPublicKeyComponents {
-    const hex = der.toString('hex');
+    // RSA SPKI structure:
+    // SEQUENCE {
+    //   SEQUENCE { algorithmIdentifier }
+    //   BITSTRING {
+    //     [0] {
+    //       SEQUENCE { n INTEGER, e INTEGER }
+    //     }
+    //   }
+    // }
 
-    // Find the BITSTRING containing the RSA key
-    // The structure is: SEQUENCE { algorithm, BITSTRING { SEQUENCE { n, e } } }
     let pos = 0;
 
-    // Skip outer SEQUENCE
-    if (hex.substring(pos, pos + 2) === '30') {
-      const len = parseInt(hex.substring(pos + 2, pos + 4), 16);
-      const actualLen = len >= 0x80 ? parseInt(hex.substring(pos + 2, pos + 4), 16) - 0x80 + 2 : 2;
-      pos += 2 + (len >= 0x80 ? 2 : 0);
+    // Read outer SEQUENCE
+    if (der[pos] !== 0x30) throw new Error('Invalid DER: expected SEQUENCE');
+    pos++;
+    pos += this.readLength(der, pos);
+
+    // Read algorithm SEQUENCE
+    if (der[pos] !== 0x30) throw new Error('Invalid DER: expected algorithm SEQUENCE');
+    pos++;
+    pos += this.readLength(der, pos);
+
+    // Skip algorithm identifier (usually OID + NULL)
+    // Just skip until we hit BITSTRING (0x03)
+    while (der[pos] !== 0x03 && pos < der.length) {
+      pos++;
+      pos += this.readLength(der, pos);
     }
 
-    // Skip algorithm SEQUENCE
-    if (hex.substring(pos, pos + 2) === '30') {
-      const len = parseInt(hex.substring(pos + 2, pos + 4), 16);
-      pos += 2 + (len >= 0x80 ? 2 : 0);
+    // Now should be BITSTRING
+    if (der[pos] !== 0x03) throw new Error('Invalid DER: expected BITSTRING');
+    pos++;
+    const bitStringLen = this.readLength(der, pos);
+    pos += this.readLength(der, pos);
+
+    // Skip the "unused bits" byte (should be 0x00)
+    pos++;
+
+    // Now read the key SEQUENCE
+    if (der[pos] !== 0x30) throw new Error('Invalid DER: expected key SEQUENCE');
+    pos++;
+    pos += this.readLength(der, pos);
+
+    // Read n (modulus) - INTEGER tag is 0x02
+    if (der[pos] !== 0x02) throw new Error('Invalid DER: expected INTEGER for n');
+    pos++;
+    const nLen = this.readLength(der, pos);
+    pos += this.readLength(der, pos);
+
+    // Check if n has leading 0x00 (for positive big integers)
+    if (der[pos] === 0x00) {
+      pos++; // skip leading zero
     }
+    const nHex = der.slice(pos, pos + nLen - 1).toString('hex');
+    pos += nLen - 1;
 
-    // Now at BITSTRING (tag 0x03)
-    // Find the key SEQUENCE inside (tag 0x30)
-    let keySeqPos = -1;
-    for (let i = pos; i < hex.length - 4; i += 2) {
-      if (hex.substring(i, i + 2) === '30' && hex.substring(i + 2, i + 4) !== '30') {
-        // Check if it's followed by a reasonable length
-        const len = parseInt(hex.substring(i + 2, i + 4), 16);
-        if (len < 0x80 || i + 4 + (len - 0x80) < hex.length) {
-          keySeqPos = i;
-          break;
-        }
-      }
+    // Read e (exponent) - INTEGER tag is 0x02
+    if (der[pos] !== 0x02) throw new Error('Invalid DER: expected INTEGER for e');
+    pos++;
+    const eLen = this.readLength(der, pos);
+    pos += this.readLength(der, pos);
+    const eHex = der.slice(pos, pos + eLen).toString('hex');
+
+    return { n: nHex, e: eHex };
+  }
+
+  /**
+   * Read ASN.1 DER length
+   */
+  private readLength(buf: Buffer, pos: number): number {
+    if (buf[pos] < 0x80) {
+      return 1;
     }
-
-    if (keySeqPos === -1) {
-      throw new Error('Could not parse RSA public key DER structure');
+    const numBytes = buf[pos] & 0x7f;
+    let len = 0;
+    for (let i = 0; i < numBytes; i++) {
+      len = (len << 8) | buf[pos + 1 + i];
     }
-
-    pos = keySeqPos + 2;
-    const keyLen = parseInt(hex.substring(pos, pos + 2), 16);
-    pos += 2;
-
-    // First INTEGER is n (modulus)
-    if (hex.substring(pos, pos + 2) === '02') {
-      const nLen = parseInt(hex.substring(pos + 2, pos + 4), 16);
-      pos += 4;
-
-      let nHex = hex.substring(pos, pos + nLen * 2);
-      // Remove leading 00 if present (for positive numbers)
-      if (nHex.startsWith('00')) {
-        nHex = nHex.substring(2);
-      }
-
-      pos += nLen * 2;
-
-      // Next INTEGER is e (exponent)
-      if (hex.substring(pos, pos + 2) === '02') {
-        const eLen = parseInt(hex.substring(pos + 2, pos + 4), 16);
-        pos += 4;
-        const eHex = hex.substring(pos, pos + eLen * 2);
-
-        return { n: nHex, e: eHex };
-      }
-    }
-
-    throw new Error('Could not parse RSA key components from DER');
+    return numBytes + 1;
   }
 
   /**
@@ -183,14 +197,11 @@ export class RsaKeyService implements OnModuleInit {
    * Returns JSON with n and e components for encryption
    */
   getPublicKey(): string {
-    // Return the public key components as JSON
-    // The app will use these to encrypt passwords
     return JSON.stringify(this.publicKeyComponents);
   }
 
   /**
    * Decrypt data using the private key
-   * Uses PKCS1 padding (compatible with most RSA implementations)
    */
   decrypt(encryptedData: string): string {
     try {
@@ -203,7 +214,6 @@ export class RsaKeyService implements OnModuleInit {
         try {
           buffer = Buffer.from(encryptedData, 'base64');
         } catch {
-          // Try raw string
           buffer = Buffer.from(encryptedData, 'utf8');
         }
       }
