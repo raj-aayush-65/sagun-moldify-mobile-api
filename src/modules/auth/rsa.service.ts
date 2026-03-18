@@ -97,15 +97,16 @@ export class RsaKeyService implements OnModuleInit {
 
   /**
    * Decrypt data using the private key
-   * Uses PKCS1 v1.5 padding to match the app's encryption
+   * Uses OAEP padding with SHA-256 to match the app's encryption
    */
   decrypt(encryptedData: string): string {
     try {
-      // Use PKCS1 v1.5 padding (matches app's encryption)
+      // Use OAEP padding with SHA-256 (matches app's encryption using Web Crypto API)
       const decrypted = crypto.privateDecrypt(
         {
           key: this.privateKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
         },
         Buffer.from(encryptedData, 'base64')
       );
