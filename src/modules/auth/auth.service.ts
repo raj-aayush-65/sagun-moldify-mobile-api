@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -16,6 +17,8 @@ import { RsaKeyService } from './rsa.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
@@ -31,14 +34,14 @@ export class AuthService {
       // Try to parse as encrypted data (JSON format from client)
       const parsed = JSON.parse(password);
       if (parsed.encryptedData && parsed.salt) {
-        // Decrypt using RSA private key
+        // Decrypt using RSA private key with OAEP padding
         const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
         // Combine with salt to get original password
-        // Note: This is a simplified version
         return decrypted + parsed.salt;
       }
-    } catch {
+    } catch (error) {
       // Not encrypted, use as-is
+      this.logger.warn(`Password decryption failed, using as plain text: ${error.message}`);
     }
     return password;
   }
@@ -57,13 +60,17 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
+    this.logger.log(`Login attempt for email: ${loginDto.email}`);
+
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
+      this.logger.warn(`Login failed for email: ${loginDto.email} - Invalid credentials`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
+      this.logger.warn(`Login failed for email: ${loginDto.email} - Account is disabled`);
       throw new UnauthorizedException('Account is disabled');
     }
 
@@ -73,6 +80,8 @@ export class AuthService {
       role: user.role,
       isSuperAdmin: user.isSuperAdmin,
     };
+
+    this.logger.log(`Login successful for email: ${loginDto.email}`);
 
     return {
       accessToken: this.jwtService.sign(payload),
@@ -151,7 +160,7 @@ export class AuthService {
       }
     }
 
-    // Decrypt password if encrypted
+    // Decrypt password if encrypted (for backwards compatibility)
     const decryptedPassword = this.decryptPassword(signupDto.password);
 
     const passwordHash = await bcrypt.hash(decryptedPassword, 10);

@@ -16,6 +16,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'An unexpected error occurred';
@@ -44,11 +45,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           errorDetails = resp.error;
         }
       }
+
+      // Log HTTP exceptions
+      this.logger.warn(`HTTP ${status} - ${message} | ${request.method} ${request.url}`);
     } else if (exception instanceof Error) {
       // Handle non-HTTP exceptions
       message = exception.message;
-      this.logger.error(`Unhandled exception: ${exception.message}`, exception.stack);
+      this.logger.error(
+        `Unhandled exception: ${exception.message} | ${request.method} ${request.url}`,
+        exception.stack
+      );
     }
+
+    // Log all responses for debugging
+    this.logger.log(`Response: ${status} | ${request.method} ${request.url} | ${message}`);
 
     // Create standardized error response
     const errorResponse = ApiResponseDto.error(message, errorDetails);

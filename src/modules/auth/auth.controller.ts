@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -20,6 +21,8 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly rsaKeyService: RsaKeyService
@@ -36,7 +39,9 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'User login' })
   async login(@Body() loginDto: LoginDto) {
+    this.logger.log(`Login attempt for email: ${loginDto.email}`);
     const result = await this.authService.login(loginDto);
+    this.logger.log(`Login successful for email: ${loginDto.email}`);
     return ApiResponseDto.success('Login successful', result);
   }
 

@@ -56,11 +56,11 @@ export class RsaKeyService implements OnModuleInit {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: {
-        type: 'pkcs1',
+        type: 'spki',
         format: 'pem',
       },
       privateKeyEncoding: {
-        type: 'pkcs1',
+        type: 'pkcs8',
         format: 'pem',
       },
     });
@@ -77,20 +77,35 @@ export class RsaKeyService implements OnModuleInit {
 
   /**
    * Decrypt data using the private key
+   * Tries OAEP first (new keys), then falls back to PKCS1 (old keys)
    */
   decrypt(encryptedData: string): string {
+    // Try OAEP first (for new SPKI/PKCS8 format keys)
     try {
       const decrypted = crypto.privateDecrypt(
         {
           key: this.privateKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
+          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
         },
         Buffer.from(encryptedData, 'base64')
       );
       return decrypted.toString('utf8');
-    } catch (error) {
-      console.error('RSA decryption error:', error);
-      throw new Error('Failed to decrypt data');
+    } catch (oaepError) {
+      // OAEP failed, try PKCS1 (for old PKCS1 format keys)
+      try {
+        const decrypted = crypto.privateDecrypt(
+          {
+            key: this.privateKey,
+            padding: crypto.constants.RSA_PKCS1_PADDING,
+          },
+          Buffer.from(encryptedData, 'base64')
+        );
+        return decrypted.toString('utf8');
+      } catch (pkcs1Error) {
+        console.error('RSA decryption error (both OAEP and PKCS1 failed):', pkcs1Error);
+        throw new Error('Failed to decrypt data - invalid key format');
+      }
     }
   }
 
