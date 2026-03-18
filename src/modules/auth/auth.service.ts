@@ -28,21 +28,24 @@ export class AuthService {
 
   /**
    * Decrypt password if encrypted, otherwise use as-is
+   * The app encrypts passwords using RSA-OAEP with the public key
    */
   private decryptPassword(password: string): string {
-    try {
-      // Try to parse as encrypted data (JSON format from client)
-      const parsed = JSON.parse(password);
-      if (parsed.encryptedData && parsed.salt) {
-        // Decrypt using RSA private key with OAEP padding
-        const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
-        // Combine with salt to get original password
-        return decrypted + parsed.salt;
+    // Check if it looks like encrypted JSON format
+    if (password.startsWith('{') && password.includes('encryptedData')) {
+      try {
+        const parsed = JSON.parse(password);
+        if (parsed.encryptedData && parsed.salt) {
+          // Decrypt using RSA private key
+          const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
+          // Combine with salt to get original password
+          return decrypted + parsed.salt;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to decrypt password: ${error.message}`);
       }
-    } catch (error) {
-      // Not encrypted, use as-is
-      this.logger.warn(`Password decryption failed, using as plain text: ${error.message}`);
     }
+    // Plain password - use as-is
     return password;
   }
 
