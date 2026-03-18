@@ -97,35 +97,22 @@ export class RsaKeyService implements OnModuleInit {
 
   /**
    * Decrypt data using the private key
-   * Tries OAEP first (new keys), then falls back to PKCS1 (old keys)
+   * Uses PKCS1 v1.5 padding to match the app's encryption
    */
   decrypt(encryptedData: string): string {
-    // Try OAEP first (for new SPKI/PKCS8 format keys)
     try {
+      // Use PKCS1 v1.5 padding (matches app's encryption)
       const decrypted = crypto.privateDecrypt(
         {
           key: this.privateKey,
-          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-          oaepHash: 'sha256',
+          padding: crypto.constants.RSA_PKCS1_PADDING,
         },
         Buffer.from(encryptedData, 'base64')
       );
       return decrypted.toString('utf8');
-    } catch (oaepError) {
-      // OAEP failed, try PKCS1 (for old PKCS1 format keys)
-      try {
-        const decrypted = crypto.privateDecrypt(
-          {
-            key: this.privateKey,
-            padding: crypto.constants.RSA_PKCS1_PADDING,
-          },
-          Buffer.from(encryptedData, 'base64')
-        );
-        return decrypted.toString('utf8');
-      } catch (pkcs1Error) {
-        console.error('RSA decryption error (both OAEP and PKCS1 failed):', pkcs1Error);
-        throw new Error('Failed to decrypt data - invalid key format');
-      }
+    } catch (error) {
+      console.error('RSA decryption error:', error);
+      throw new Error('Failed to decrypt data');
     }
   }
 
