@@ -1,10 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '../../../common/enums/user-role.enum';
 
 /**
  * Create User DTO
- * Note: Role is determined server-side based on the creator's permissions.
- * DO NOT accept role in the payload for security.
+ * Role is optional - if provided, server validates creator's permissions.
+ * If not provided, server assigns default role based on creator's permissions.
  */
 export class CreateUserDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -32,4 +33,9 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiProperty({ example: 'EMPLOYEE', required: false, enum: UserRole })
+  @IsEnum(UserRole)
+  @IsOptional()
+  role?: UserRole;
 }

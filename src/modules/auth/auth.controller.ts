@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RsaKeyService } from './rsa.service';
+import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -35,7 +36,8 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'User login' })
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+    const result = await this.authService.login(loginDto);
+    return ApiResponseDto.success('Login successful', result);
   }
 
   @Post('signup')
@@ -80,7 +82,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Refresh access token' })
   async refresh(@Request() req: any) {
-    return this.authService.refreshToken(req.user);
+    const result = await this.authService.refreshToken(req.user);
+    return ApiResponseDto.success('Token refreshed successfully', result);
   }
 
   @Get('me')
@@ -89,6 +92,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user' })
   async me(@Request() req: any) {
     const { passwordHash: _passwordHash, ...user } = req.user;
-    return user;
+    return ApiResponseDto.success('User fetched successfully', user);
   }
 }

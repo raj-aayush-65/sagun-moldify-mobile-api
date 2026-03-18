@@ -18,6 +18,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -30,33 +31,38 @@ export class UsersController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   @ApiOperation({ summary: 'Get all users (Super Admin/Super User only)' })
   async findAll() {
-    return this.usersService.findAll();
+    const users = await this.usersService.findAll();
+    return ApiResponseDto.success('Users fetched successfully', users);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+    const user = await this.usersService.findOne(id);
+    return ApiResponseDto.success('User fetched successfully', user);
   }
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   @ApiOperation({ summary: 'Create new user (Admin only)' })
   async create(@Body() createUserDto: CreateUserDto, @Request() req: any) {
-    return this.usersService.create(createUserDto, req.user.id);
+    const user = await this.usersService.create(createUserDto, req.user.id);
+    return ApiResponseDto.success('User created successfully', user);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   @ApiOperation({ summary: 'Update user (Admin only)' })
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+    const user = await this.usersService.update(id, updateUserDto);
+    return ApiResponseDto.success('User updated successfully', user);
   }
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Deactivate user (Super Admin only)' })
   async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.deactivate(id);
+    const result = await this.usersService.deactivate(id);
+    return ApiResponseDto.success('User deactivated successfully', result);
   }
 }
