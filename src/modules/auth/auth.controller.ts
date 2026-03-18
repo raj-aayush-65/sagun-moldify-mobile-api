@@ -7,6 +7,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -38,12 +39,15 @@ export class AuthController {
   }
 
   @Post('signup')
-  @ApiExcludeEndpoint() // Hidden - use only for initial setup
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiExcludeEndpoint() // Hidden - disabled for public use
   @ApiOperation({
-    summary: '[HIDDEN] Initial Super Admin setup - only works when no admin exists',
+    summary: '[DISABLED] Signup is disabled. Contact your administrator for access.',
   })
-  async signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
+  async signup(@Body() _signupDto: SignupDto, @Request() _req: any) {
+    // Signup is disabled - users can only be created by Super Admins
+    throw new ForbiddenException('Signup is disabled. Contact your administrator for access.');
   }
 
   /**

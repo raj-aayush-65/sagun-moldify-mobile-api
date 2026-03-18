@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -21,12 +21,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    if (!payload.sub) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
     const user = await this.usersRepository.findOne({
       where: { id: payload.sub },
     });
 
-    if (!user || !user.isActive) {
-      return null;
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Allow access if isActive is true or undefined/null (default to true)
+    // This ensures existing users can still access the system
+    if (user.isActive === false) {
+      throw new UnauthorizedException('Account is disabled');
     }
 
     return user;
