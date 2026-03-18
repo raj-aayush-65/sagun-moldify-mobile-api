@@ -6,15 +6,18 @@ import { AppModule } from "./app.module";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Get CORS origin from environment
-  const corsOrigin = process.env.CORS_ORIGIN || "*";
-
-  // Enable CORS for mobile app
+  // Enable CORS for mobile app and GitHub Pages
   app.enableCors({
-    origin: corsOrigin.split(","),
+    origin: true, // Allow all origins in production
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Access-Control-Allow-Origin",
+    ],
+    exposedHeaders: ["Authorization"],
   });
 
   // Global prefix for all API routes
