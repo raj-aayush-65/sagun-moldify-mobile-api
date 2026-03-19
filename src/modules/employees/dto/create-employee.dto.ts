@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsEmail, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsEmail,
+  Min,
+  IsBoolean,
+} from 'class-validator';
 import { EmployeeType } from '../entities/employee.entity';
 
 export class CreateEmployeeDto {
@@ -12,6 +21,10 @@ export class CreateEmployeeDto {
 
   @IsEnum(EmployeeType)
   employeeType: EmployeeType;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
   @IsOptional()
   @IsNumber()
