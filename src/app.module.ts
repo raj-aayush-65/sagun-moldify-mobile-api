@@ -3,6 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { EmployeesModule } from './modules/employees/employees.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -37,6 +40,9 @@ import { HealthModule } from './modules/health/health.module';
     // Feature Modules
     AuthModule,
     UsersModule,
+    EmployeesModule,
+    AttendanceModule,
+    PayrollModule,
     HealthModule,
   ],
   controllers: [],

@@ -1,0 +1,310 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between } from 'typeorm';
+import { Attendance, AttendanceStatus, ShiftType } from './entities/attendance.entity';
+import {
+  CreateAttendanceDto,
+  BulkAttendanceDto,
+  MarkAllPresentDto,
+  UpdateAttendanceDto,
+} from './dto/create-attendance.dto';
+import { EmployeesService } from '../employees/employees.service';
+
+// IST timezone offset (UTC+5:30)
+const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+
+function toISTDate(date: Date): Date {
+  return new Date(date.getTime() + IST_OFFSET);
+}
+
+function getISTDateString(date: Date): string {
+  const istDate = toISTDate(date);
+  return istDate.toISOString().split('T')[0];
+}
+
+@Injectable()
+export class AttendanceService {
+  constructor(
+    @InjectRepository(Attendance)
+    private attendanceRepository: Repository<Attendance>,
+    private employeesService: EmployeesService
+  ) {}
+
+  async create(createAttendanceDto: CreateAttendanceDto, userId: string): Promise<Attendance> {
+    // Check if employee exists
+    await this.employeesService.findOne(createAttendanceDto.employeeId);
+
+    // Check if attendance already exists for this employee and date
+    const existingAttendance = await this.attendanceRepository.findOne({
+      where: {
+        employeeId: createAttendanceDto.employeeId,
+        attendanceDate: new Date(createAttendanceDto.attendanceDate),
+      },
+    });
+
+    if (existingAttendance) {
+      throw new BadRequestException(
+        `Attendance already exists for this employee on ${createAttendanceDto.attendanceDate}`
+      );
+    }
+
+    // Check if it's a Monday - if so, set status to WORKED_MONDAY if marked as present
+    const date = new Date(createAttendanceDto.attendanceDate);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday
+
+    const attendanceData: Partial<Attendance> = {
+      employeeId: createAttendanceDto.employeeId,
+      attendanceDate: new Date(createAttendanceDto.attendanceDate),
+      status: createAttendanceDto.status || AttendanceStatus.PRESENT,
+      shift: createAttendanceDto.shift || ShiftType.DAY_SHIFT,
+      isHolidayWorked: createAttendanceDto.isHolidayWorked || false,
+      overtimeMultiplier: createAttendanceDto.overtimeMultiplier || 1.0,
+      createdBy: userId,
+    };
+
+    if (createAttendanceDto.balanceDate) {
+      attendanceData.balanceDate = new Date(createAttendanceDto.balanceDate);
+    }
+
+    const attendance = this.attendanceRepository.create(attendanceData);
+
+    // Auto-set Monday as holiday
+    if (dayOfWeek === 1 && createAttendanceDto.status === AttendanceStatus.PRESENT) {
+      attendance.status = AttendanceStatus.WORKED_MONDAY;
+      attendance.isHolidayWorked = true;
+    }
+
+    return this.attendanceRepository.save(attendance);
+  }
+
+  async createBulk(bulkDto: BulkAttendanceDto, userId: string): Promise<Attendance[]> {
+    const results: Attendance[] = [];
+
+    for (const record of bulkDto.attendanceRecords) {
+      try {
+        const attendance = await this.create(record, userId);
+        results.push(attendance);
+      } catch (error) {
+        // Skip if already exists, continue with others
+        if (error instanceof BadRequestException) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    return results;
+  }
+
+  async markAllPresent(markAllPresentDto: MarkAllPresentDto, userId: string): Promise<number> {
+    const employees = await this.employeesService.getActiveEmployees();
+
+    // Filter out excluded employees
+    const excludeIds = markAllPresentDto.excludeEmployeeIds || [];
+    const eligibleEmployees = employees.filter(e => !excludeIds.includes(e.id));
+
+    let count = 0;
+    const date = new Date(markAllPresentDto.attendanceDate);
+    const dayOfWeek = date.getDay();
+
+    for (const employee of eligibleEmployees) {
+      // Check if attendance already exists
+      const existingAttendance = await this.attendanceRepository.findOne({
+        where: {
+          employeeId: employee.id,
+          attendanceDate: date,
+        },
+      });
+
+      if (!existingAttendance) {
+        let status = AttendanceStatus.PRESENT;
+        let isHolidayWorked = false;
+
+        // Auto-set Monday as WORKED_MONDAY
+        if (dayOfWeek === 1) {
+          status = AttendanceStatus.WORKED_MONDAY;
+          isHolidayWorked = true;
+        }
+
+        const attendance = this.attendanceRepository.create({
+          employeeId: employee.id,
+          attendanceDate: date,
+          status,
+          shift: ShiftType.DAY_SHIFT,
+          isHolidayWorked,
+          createdBy: userId,
+        });
+
+        await this.attendanceRepository.save(attendance);
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  async findAll(filters?: {
+    employeeId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: AttendanceStatus;
+  }): Promise<Attendance[]> {
+    const query = this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.employee', 'employee');
+
+    if (filters?.employeeId) {
+      query.andWhere('attendance.employeeId = :employeeId', {
+        employeeId: filters.employeeId,
+      });
+    }
+
+    if (filters?.startDate && filters?.endDate) {
+      query.andWhere('attendance.attendanceDate BETWEEN :startDate AND :endDate', {
+        startDate: new Date(filters.startDate),
+        endDate: new Date(filters.endDate),
+      });
+    }
+
+    if (filters?.status) {
+      query.andWhere('attendance.status = :status', { status: filters.status });
+    }
+
+    return query.orderBy('attendance.attendanceDate', 'DESC').getMany();
+  }
+
+  async findOne(id: string): Promise<Attendance> {
+    const attendance = await this.attendanceRepository.findOne({
+      where: { id },
+      relations: ['employee'],
+    });
+
+    if (!attendance) {
+      throw new NotFoundException(`Attendance with ID ${id} not found`);
+    }
+
+    return attendance;
+  }
+
+  async update(id: string, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
+    const attendance = await this.findOne(id);
+
+    // If status changed to PRESENT on a Monday, auto-set to WORKED_MONDAY
+    if (updateAttendanceDto.status === AttendanceStatus.PRESENT && attendance.attendanceDate) {
+      const dayOfWeek = new Date(attendance.attendanceDate).getDay();
+      if (dayOfWeek === 1) {
+        updateAttendanceDto.status = AttendanceStatus.WORKED_MONDAY;
+        updateAttendanceDto.isHolidayWorked = true;
+      }
+    }
+
+    Object.assign(attendance, updateAttendanceDto);
+
+    if (updateAttendanceDto.balanceDate) {
+      attendance.balanceDate = new Date(updateAttendanceDto.balanceDate);
+    }
+
+    return this.attendanceRepository.save(attendance);
+  }
+
+  async remove(id: string): Promise<void> {
+    const attendance = await this.findOne(id);
+    await this.attendanceRepository.remove(attendance);
+  }
+
+  async getMonthlyAttendance(year: number, month: number): Promise<Attendance[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0); // Last day of month
+
+    return this.findAll({
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+    });
+  }
+
+  async getEmployeeAttendanceForMonth(
+    employeeId: string,
+    year: number,
+    month: number
+  ): Promise<Attendance[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    return this.attendanceRepository.find({
+      where: {
+        employeeId,
+        attendanceDate: Between(startDate, endDate),
+      },
+      order: { attendanceDate: 'ASC' },
+    });
+  }
+
+  async getAttendanceSummary(
+    employeeId: string,
+    year: number,
+    month: number
+  ): Promise<{
+    present: number;
+    absent: number;
+    halfDay: number;
+    workedMonday: number;
+    totalDays: number;
+  }> {
+    const attendance = await this.getEmployeeAttendanceForMonth(employeeId, year, month);
+
+    const present = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
+    const absent = attendance.filter(a => a.status === AttendanceStatus.ABSENT).length;
+    const halfDay = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
+    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKED_MONDAY).length;
+
+    // Count days in month
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    return {
+      present,
+      absent,
+      halfDay,
+      workedMonday,
+      totalDays: daysInMonth,
+    };
+  }
+
+  async getOrCreateDefaultAttendance(
+    employeeId: string,
+    date: Date,
+    userId: string
+  ): Promise<Attendance> {
+    const dateStr = getISTDateString(date);
+    const existingAttendance = await this.attendanceRepository.findOne({
+      where: {
+        employeeId,
+        attendanceDate: new Date(dateStr),
+      },
+    });
+
+    if (existingAttendance) {
+      return existingAttendance;
+    }
+
+    // Check if it's a Monday - auto mark as WORKED_MONDAY
+    const dayOfWeek = date.getDay();
+    let status = AttendanceStatus.PRESENT;
+    let isHolidayWorked = false;
+
+    if (dayOfWeek === 1) {
+      status = AttendanceStatus.WORKED_MONDAY;
+      isHolidayWorked = true;
+    }
+
+    const attendance = this.attendanceRepository.create({
+      employeeId,
+      attendanceDate: new Date(dateStr),
+      status,
+      shift: ShiftType.DAY_SHIFT,
+      isHolidayWorked,
+      createdBy: userId,
+    });
+
+    return this.attendanceRepository.save(attendance);
+  }
+}

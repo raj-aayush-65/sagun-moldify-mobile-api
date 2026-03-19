@@ -16,6 +16,9 @@ export enum PermissionType {
 
 export enum ModuleType {
   USERS = 'USERS',
+  EMPLOYEES = 'EMPLOYEES',
+  ATTENDANCE = 'ATTENDANCE',
+  PAYROLL = 'PAYROLL',
   DASHBOARD = 'DASHBOARD',
   REPORTS = 'REPORTS',
   SETTINGS = 'SETTINGS',
