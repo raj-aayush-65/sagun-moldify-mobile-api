@@ -27,7 +27,7 @@ interface AuthRequest {
   };
 }
 
-@Controller('api/payroll')
+@Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PayrollController {
   constructor(

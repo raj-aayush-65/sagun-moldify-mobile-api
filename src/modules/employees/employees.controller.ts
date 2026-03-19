@@ -27,7 +27,7 @@ interface AuthRequest {
   };
 }
 
-@Controller('api/employees')
+@Controller('employees')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}

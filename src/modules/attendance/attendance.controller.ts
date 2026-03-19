@@ -31,7 +31,7 @@ interface AuthRequest {
   };
 }
 
-@Controller('api/attendance')
+@Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
