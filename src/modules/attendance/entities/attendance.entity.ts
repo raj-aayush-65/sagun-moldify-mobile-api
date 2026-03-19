@@ -14,7 +14,8 @@ export enum AttendanceStatus {
   ABSENT = 'ABSENT',
   HALF_DAY = 'HALF_DAY',
   HOLIDAY = 'HOLIDAY',
-  WORKED_MONDAY = 'WORKED_MONDAY',
+  LEAVE = 'LEAVE',
+  WORKING = 'WORKING', // For working on Monday (which is a holiday)
 }
 
 export enum ShiftType {

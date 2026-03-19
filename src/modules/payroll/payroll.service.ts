@@ -134,7 +134,7 @@ export class PayrollService {
     // Count different attendance types
     const presentDays = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
     const halfDays = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
-    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKED_MONDAY).length;
+    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKING).length;
 
     // Calculate work balance (Monday worked = extra day)
     // For simplicity, we'll consider each worked Monday as +1 day

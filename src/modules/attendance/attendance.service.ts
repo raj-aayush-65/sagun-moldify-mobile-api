@@ -68,9 +68,9 @@ export class AttendanceService {
 
     const attendance = this.attendanceRepository.create(attendanceData);
 
-    // Auto-set Monday as holiday
+    // Auto-set Monday as holiday worked
     if (dayOfWeek === 1 && createAttendanceDto.status === AttendanceStatus.PRESENT) {
-      attendance.status = AttendanceStatus.WORKED_MONDAY;
+      attendance.status = AttendanceStatus.WORKING;
       attendance.isHolidayWorked = true;
     }
 
@@ -120,9 +120,9 @@ export class AttendanceService {
         let status = AttendanceStatus.PRESENT;
         let isHolidayWorked = false;
 
-        // Auto-set Monday as WORKED_MONDAY
+        // Auto-set Monday as WORKING
         if (dayOfWeek === 1) {
-          status = AttendanceStatus.WORKED_MONDAY;
+          status = AttendanceStatus.WORKING;
           isHolidayWorked = true;
         }
 
@@ -189,11 +189,11 @@ export class AttendanceService {
   async update(id: string, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
     const attendance = await this.findOne(id);
 
-    // If status changed to PRESENT on a Monday, auto-set to WORKED_MONDAY
+    // If status changed to PRESENT on a Monday, auto-set to WORKING
     if (updateAttendanceDto.status === AttendanceStatus.PRESENT && attendance.attendanceDate) {
       const dayOfWeek = new Date(attendance.attendanceDate).getDay();
       if (dayOfWeek === 1) {
-        updateAttendanceDto.status = AttendanceStatus.WORKED_MONDAY;
+        updateAttendanceDto.status = AttendanceStatus.WORKING;
         updateAttendanceDto.isHolidayWorked = true;
       }
     }
@@ -255,7 +255,7 @@ export class AttendanceService {
     const present = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
     const absent = attendance.filter(a => a.status === AttendanceStatus.ABSENT).length;
     const halfDay = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
-    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKED_MONDAY).length;
+    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKING).length;
 
     // Count days in month
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -286,13 +286,13 @@ export class AttendanceService {
       return existingAttendance;
     }
 
-    // Check if it's a Monday - auto mark as WORKED_MONDAY
+    // Check if it's a Monday - auto mark as WORKING
     const dayOfWeek = date.getDay();
     let status = AttendanceStatus.PRESENT;
     let isHolidayWorked = false;
 
     if (dayOfWeek === 1) {
-      status = AttendanceStatus.WORKED_MONDAY;
+      status = AttendanceStatus.WORKING;
       isHolidayWorked = true;
     }
 
