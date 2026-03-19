@@ -287,6 +287,19 @@ export class PayrollService {
     return this.payrollEntryRepository.save(entry);
   }
 
+  async getPayrollEntry(id: string): Promise<PayrollEntry> {
+    const entry = await this.payrollEntryRepository.findOne({
+      where: { id },
+      relations: ['employee'],
+    });
+
+    if (!entry) {
+      throw new NotFoundException(`Payroll entry with ID ${id} not found`);
+    }
+
+    return entry;
+  }
+
   async getPayrollSummary(
     year: number,
     month: number

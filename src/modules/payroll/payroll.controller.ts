@@ -5,11 +5,15 @@ import {
   Put,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   ParseUUIDPipe,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { PayrollService } from './payroll.service';
+import { PdfService } from './pdf.service';
 import { PayrollEntryStatus } from './entities/payroll-entry.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -26,7 +30,10 @@ interface AuthRequest {
 @Controller('api/payroll')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PayrollController {
-  constructor(private readonly payrollService: PayrollService) {}
+  constructor(
+    private readonly payrollService: PayrollService,
+    private readonly pdfService: PdfService
+  ) {}
 
   @Post('run')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
@@ -93,5 +100,32 @@ export class PayrollController {
     }
   ) {
     return this.payrollService.updatePayrollEntry(id, body as any);
+  }
+
+  @Get('pdf/:entryId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
+  async generatePayslip(
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Res() res: Response
+  ) {
+    const entry = await this.payrollService.getPayrollEntry(entryId);
+    const pdfBuffer = await this.pdfService.generatePayslip(entry, parseInt(month), parseInt(year));
+
+    const filename = this.pdfService.getFilename(
+      entry.employee?.name || 'Employee',
+      entry.employeeId,
+      parseInt(month),
+      parseInt(year)
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.end(pdfBuffer);
   }
 }
