@@ -14,6 +14,13 @@ export enum EmployeeType {
   PICKER = 'PICKER',
 }
 
+export enum EmployeeStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ON_LEAVE = 'ON_LEAVE',
+  RESIGNED = 'RESIGNED',
+}
+
 @Entity('employees')
 export class Employee {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +39,14 @@ export class Employee {
     default: EmployeeType.PERMANENT,
   })
   employeeType: EmployeeType;
+
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: EmployeeStatus,
+    default: EmployeeStatus.ACTIVE,
+  })
+  status: EmployeeStatus;
 
   @Column({
     name: 'monthly_salary',
