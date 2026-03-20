@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, TableColumn, TableForeignKey } from 'typeorm';
+import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
 export class AddAttendanceRateFields1732000000000 implements MigrationInterface {
   name = 'AddAttendanceRateFields1732000000000';
