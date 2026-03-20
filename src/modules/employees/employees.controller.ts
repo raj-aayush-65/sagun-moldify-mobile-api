@@ -99,4 +99,10 @@ export class EmployeesController {
   getEmployeesByType(@Param('type') type: EmployeeType) {
     return this.employeesService.getEmployeesByType(type);
   }
+
+  @Get('permanent/for-attendance')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
+  getPermanentEmployeesForAttendance() {
+    return this.employeesService.getEmployeesByType(EmployeeType.PERMANENT);
+  }
 }

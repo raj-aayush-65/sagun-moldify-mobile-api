@@ -10,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AttendanceStatus, ShiftType } from '../entities/attendance.entity';
+import { AttendanceStatus, ShiftType, CupsUnit } from '../entities/attendance.entity';
 
 export class CreateAttendanceDto {
   @IsString()
@@ -38,6 +38,36 @@ export class CreateAttendanceDto {
   @IsNumber()
   @IsOptional()
   overtimeMultiplier?: number;
+
+  // For OCCASIONAL employees - rate per visit
+  @IsNumber()
+  @IsOptional()
+  perVisitRate?: number;
+
+  // For PICKER employees - legacy rate per cup (single rate)
+  @IsNumber()
+  @IsOptional()
+  perCupRate?: number;
+
+  // For PICKER employees - cups count (in selected unit)
+  @IsNumber()
+  @IsOptional()
+  cupsCount?: number;
+
+  // For PICKER employees - cups unit (PER_100, PER_THOUSAND, PER_10_THOUSAND)
+  @IsEnum(CupsUnit)
+  @IsOptional()
+  cupsUnit?: CupsUnit;
+
+  // For PICKER employees - rate per selected unit
+  @IsNumber()
+  @IsOptional()
+  cupsRate?: number;
+
+  // For PICKER employees - rate unit (can be different from cups unit)
+  @IsEnum(CupsUnit)
+  @IsOptional()
+  cupsRateUnit?: CupsUnit;
 }
 
 export class BulkAttendanceDto {
@@ -80,4 +110,34 @@ export class UpdateAttendanceDto {
   @IsNumber()
   @IsOptional()
   overtimeMultiplier?: number;
+
+  // For OCCASIONAL employees - rate per visit
+  @IsNumber()
+  @IsOptional()
+  perVisitRate?: number;
+
+  // For PICKER employees - legacy rate per cup
+  @IsNumber()
+  @IsOptional()
+  perCupRate?: number;
+
+  // For PICKER employees - cups count
+  @IsNumber()
+  @IsOptional()
+  cupsCount?: number;
+
+  // For PICKER employees - cups unit
+  @IsEnum(CupsUnit)
+  @IsOptional()
+  cupsUnit?: CupsUnit;
+
+  // For PICKER employees - rate
+  @IsNumber()
+  @IsOptional()
+  cupsRate?: number;
+
+  // For PICKER employees - rate unit
+  @IsEnum(CupsUnit)
+  @IsOptional()
+  cupsRateUnit?: CupsUnit;
 }

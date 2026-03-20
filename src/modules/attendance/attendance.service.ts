@@ -66,6 +66,30 @@ export class AttendanceService {
       attendanceData.balanceDate = new Date(createAttendanceDto.balanceDate);
     }
 
+    // Map perVisitRate for Occasional employees
+    if (createAttendanceDto.perVisitRate !== undefined) {
+      attendanceData.perVisitRate = createAttendanceDto.perVisitRate;
+    }
+
+    // Map perCupRate for Picker employees (legacy)
+    if (createAttendanceDto.perCupRate !== undefined) {
+      attendanceData.perCupRate = createAttendanceDto.perCupRate;
+    }
+
+    // Map cups-related fields for Picker employees
+    if (createAttendanceDto.cupsCount !== undefined) {
+      attendanceData.cupsCount = createAttendanceDto.cupsCount;
+    }
+    if (createAttendanceDto.cupsUnit) {
+      attendanceData.cupsUnit = createAttendanceDto.cupsUnit;
+    }
+    if (createAttendanceDto.cupsRate !== undefined) {
+      attendanceData.cupsRate = createAttendanceDto.cupsRate;
+    }
+    if (createAttendanceDto.cupsRateUnit) {
+      attendanceData.cupsRateUnit = createAttendanceDto.cupsRateUnit;
+    }
+
     const attendance = this.attendanceRepository.create(attendanceData);
 
     // Auto-set Monday as holiday worked
