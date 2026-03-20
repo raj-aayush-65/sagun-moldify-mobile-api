@@ -106,6 +106,13 @@ export class AttendanceService {
 
     for (const record of bulkDto.attendanceRecords) {
       try {
+        // Verify employee is Permanent before creating attendance
+        const employee = await this.employeesService.findOne(record.employeeId);
+        if (employee.employeeType !== 'PERMANENT') {
+          // Skip non-permanent employees in bulk attendance
+          continue;
+        }
+
         const attendance = await this.create(record, userId);
         results.push(attendance);
       } catch (error) {

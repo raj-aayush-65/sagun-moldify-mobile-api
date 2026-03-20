@@ -22,6 +22,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 import { AttendanceStatus } from '../attendance/entities/attendance.entity';
+import { calculatePickerEarnings } from '../../common/utils/payroll.utils';
 
 // Helper functions for preview
 const SALARY_DAYS = 30;
@@ -109,6 +110,86 @@ export class PayrollController {
     const previews = employees.map(employee => {
       const attendance = allAttendance.filter((a: any) => a.employeeId === employee.id);
 
+      // Handle different employee types
+      if (employee.employeeType === 'PICKER') {
+        // For Picker employees - calculate based on cups worked
+        let totalEarnings = 0;
+        let totalCups = 0;
+        let visits = 0;
+
+        attendance.forEach((a: any) => {
+          if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
+            visits++;
+            if (a.cupsCount && a.cupsRate) {
+              const earnings = calculatePickerEarnings(
+                a.cupsCount,
+                a.cupsUnit,
+                a.cupsRate,
+                a.cupsRateUnit
+              );
+              totalEarnings += earnings;
+              totalCups += a.cupsCount;
+            }
+          }
+        });
+
+        return {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeeType: employee.employeeType,
+          designation: employee.designation,
+          monthlySalary: 0,
+          workingDays: visits,
+          requiredDays: requiredWorkingDays,
+          totalDays: totalDaysInMonth,
+          overtimeDays: 0,
+          dailyRate: 0,
+          baseSalary: totalEarnings,
+          overtimeAmount: 0,
+          netSalary: totalEarnings,
+          multiplier: 0,
+          // Additional picker-specific fields
+          cupsWorked: totalCups,
+          pickerEarnings: totalEarnings,
+        };
+      }
+
+      if (employee.employeeType === 'OCCASIONAL') {
+        // For Occasional employees - calculate based on visits
+        let totalEarnings = 0;
+        let visits = 0;
+
+        attendance.forEach((a: any) => {
+          if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
+            visits++;
+            if (a.perVisitRate) {
+              totalEarnings += a.perVisitRate;
+            }
+          }
+        });
+
+        return {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeeType: employee.employeeType,
+          designation: employee.designation,
+          monthlySalary: 0,
+          workingDays: visits,
+          requiredDays: requiredWorkingDays,
+          totalDays: totalDaysInMonth,
+          overtimeDays: 0,
+          dailyRate: 0,
+          baseSalary: totalEarnings,
+          overtimeAmount: 0,
+          netSalary: totalEarnings,
+          multiplier: 0,
+          // Additional occasional-specific fields
+          visits,
+          occasionalEarnings: totalEarnings,
+        };
+      }
+
+      // For Permanent employees - calculate based on monthly salary and attendance
       const monthlySalary = Number(employee.monthlySalary) || 0;
       const dailyRate = monthlySalary / SALARY_DAYS;
 
