@@ -8,12 +8,14 @@ import { PayrollController } from './payroll.controller';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EmployeesModule } from '../employees/employees.module';
 import { AttendanceModule } from '../attendance/attendance.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PayrollRun, PayrollEntry]),
     EmployeesModule,
     AttendanceModule,
+    UsersModule,
   ],
   controllers: [PayrollController],
   providers: [PayrollService, PdfService, RolesGuard],

@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { PayrollRun, PayrollStatus } from './entities/payroll-run.entity';
 import { PayrollEntry, PayrollEntryStatus } from './entities/payroll-entry.entity';
 import { EmployeesService } from '../employees/employees.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { Employee, EmployeeType } from '../employees/entities/employee.entity';
 import { AttendanceStatus } from '../attendance/entities/attendance.entity';
+import { User } from '../users/entities/user.entity';
 
 // Default overtime multiplier
 const DEFAULT_OVERTIME_MULTIPLIER = 1.5;
@@ -36,6 +37,8 @@ export class PayrollService {
     private payrollRunRepository: Repository<PayrollRun>,
     @InjectRepository(PayrollEntry)
     private payrollEntryRepository: Repository<PayrollEntry>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private employeesService: EmployeesService,
     private attendanceService: AttendanceService
   ) {}
@@ -279,9 +282,27 @@ export class PayrollService {
   }
 
   async getAllPayrollRuns(): Promise<PayrollRun[]> {
-    return this.payrollRunRepository.find({
+    const runs = await this.payrollRunRepository.find({
+      relations: ['entries', 'entries.employee'],
       order: { runForMonth: 'DESC' },
     });
+
+    // Get all unique user IDs
+    const userIds = [...new Set(runs.map(run => run.generatedBy).filter(Boolean))] as string[];
+
+    // Fetch users if we have any
+    let users: User[] = [];
+    if (userIds.length > 0) {
+      users = await this.userRepository.find({ where: { id: In(userIds) } });
+    }
+
+    // Map user names to runs
+    const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName || ''}`.trim()]));
+
+    return runs.map(run => ({
+      ...run,
+      processedByName: run.generatedBy ? userMap.get(run.generatedBy) || 'Unknown' : 'N/A',
+    }));
   }
 
   async lockPayroll(id: string): Promise<PayrollRun> {
