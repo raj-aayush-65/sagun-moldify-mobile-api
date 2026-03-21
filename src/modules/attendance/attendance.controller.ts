@@ -100,6 +100,12 @@ export class AttendanceController {
     return this.attendanceService.getAttendanceSummary(employeeId, parseInt(year), parseInt(month));
   }
 
+  @Get('check/:date')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
+  checkAttendanceForDate(@Param('date') date: string) {
+    return this.attendanceService.checkAttendanceForDate(date);
+  }
+
   @Get(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
   findOne(@Param('id', ParseUUIDPipe) id: string) {

@@ -300,6 +300,31 @@ export class AttendanceService {
     };
   }
 
+  async checkAttendanceForDate(
+    date: string
+  ): Promise<Record<string, { status: string; shift: string; id: string }>> {
+    // Get all attendance records for the given date
+    const attendanceRecords = await this.attendanceRepository.find({
+      where: {
+        attendanceDate: new Date(date),
+      },
+      select: ['id', 'employeeId', 'status', 'shift'],
+    });
+
+    // Convert to a map for efficient lookup
+    const attendanceMap: Record<string, { status: string; shift: string; id: string }> = {};
+
+    for (const record of attendanceRecords) {
+      attendanceMap[record.employeeId] = {
+        status: record.status,
+        shift: record.shift,
+        id: record.id,
+      };
+    }
+
+    return attendanceMap;
+  }
+
   async getOrCreateDefaultAttendance(
     employeeId: string,
     date: Date,
@@ -317,13 +342,14 @@ export class AttendanceService {
       return existingAttendance;
     }
 
-    // Check if it's a Monday - auto mark as WORKING
+    // Check if it's a Monday - auto mark as PRESENT with isHolidayWorked flag
     const dayOfWeek = date.getDay();
     let status = AttendanceStatus.PRESENT;
     let isHolidayWorked = false;
 
     if (dayOfWeek === 1) {
-      status = AttendanceStatus.WORKING;
+      // Monday is a holiday - mark as PRESENT with isHolidayWorked flag
+      status = AttendanceStatus.PRESENT;
       isHolidayWorked = true;
     }
 
