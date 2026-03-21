@@ -4,13 +4,21 @@ export class AddLeaveStatusToAttendance1732000000002 implements MigrationInterfa
   name = 'AddLeaveStatusToAttendance1732000000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add LEAVE to the attendance_status enum
-    await queryRunner.query(`
-      ALTER TYPE attendance_status ADD VALUE IF NOT EXISTS 'LEAVE';
+    // Check if LEAVE already exists in enum
+    const checkLeave = await queryRunner.query(`
+      SELECT enumlabel FROM pg_enum 
+      WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'attendance_status')
+      AND enumlabel = 'LEAVE';
     `);
 
-    // Rename WORKED_MONDAY to WORKING if it exists (for consistency)
-    // First check if WORKED_MONDAY exists
+    if (checkLeave.length === 0) {
+      // Add LEAVE to the attendance_status enum
+      await queryRunner.query(`
+        ALTER TYPE attendance_status ADD VALUE IF NOT EXISTS 'LEAVE';
+      `);
+    }
+
+    // Check if WORKED_MONDAY exists and rename to WORKING
     const checkWorkedMonday = await queryRunner.query(`
       SELECT enumlabel FROM pg_enum 
       WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'attendance_status')
@@ -25,15 +33,8 @@ export class AddLeaveStatusToAttendance1732000000002 implements MigrationInterfa
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    // Remove LEAVE from enum
-    await queryRunner.query(`
-      ALTER TYPE attendance_status DROP VALUE IF EXISTS 'LEAVE';
-    `);
-
-    // Rename WORKING back to WORKED_MONDAY
-    await queryRunner.query(`
-      ALTER TYPE attendance_status RENAME VALUE 'WORKING' TO 'WORKED_MONDAY';
-    `);
+  public async down(_queryRunner: QueryRunner): Promise<void> {
+    // Note: Cannot easily remove enum values in PostgreSQL
+    // This is a one-way migration for practical purposes
   }
 }
