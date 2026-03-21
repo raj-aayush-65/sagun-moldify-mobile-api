@@ -285,6 +285,18 @@ export class PayrollController {
     @Query('year') year: string,
     @Res() res: Response
   ) {
+    // Validate parameters
+    if (!month || !year) {
+      throw new NotFoundException('Missing required parameters: month, year');
+    }
+
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+
+    if (isNaN(monthNum) || isNaN(yearNum) || monthNum < 1 || monthNum > 12) {
+      throw new NotFoundException('Invalid month or year parameters');
+    }
+
     const entry = await this.payrollService.getPayrollEntry(entryId);
     const pdfBuffer = await this.pdfService.generatePayslip(entry, parseInt(month), parseInt(year));
 
@@ -312,10 +324,22 @@ export class PayrollController {
     @Query('year') year: string,
     @Res() res: Response
   ) {
+    // Validate parameters
+    if (!employeeId || !month || !year) {
+      throw new NotFoundException('Missing required parameters: employeeId, month, year');
+    }
+
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+
+    if (isNaN(monthNum) || isNaN(yearNum) || monthNum < 1 || monthNum > 12) {
+      throw new NotFoundException('Invalid month or year parameters');
+    }
+
     const entry = await this.payrollService.getPayrollEntryByEmployeeAndMonth(
       employeeId,
-      parseInt(year),
-      parseInt(month)
+      yearNum,
+      monthNum
     );
 
     if (!entry) {
