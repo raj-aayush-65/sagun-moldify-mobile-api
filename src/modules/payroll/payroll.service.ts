@@ -158,7 +158,7 @@ export class PayrollService {
 
     const monthlySalary = Number(employee.monthlySalary) || 0;
 
-    // Fixed: Use 30 days as divisor as per user requirement
+    // Fixed: Use 30 days as divisor for deduction calculation
     const dailyRate = monthlySalary / SALARY_DAYS;
 
     // Get actual days in the month and Mondays
@@ -171,25 +171,30 @@ export class PayrollService {
     // Count different attendance types
     const presentDays = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
     const halfDays = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
-    // WORKING status means Monday was worked - it's a regular work day, not extra
+    // WORKING status means Monday was worked - it counts as a regular work day
     const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKING).length;
 
-    // Effective days worked: Present + Worked Monday + (Half days * 0.5)
-    // Note: WORKING is counted as a regular day, not extra
+    // Absent days: Required days minus (Present + Worked Monday + Half days)
+    // Note: WORKING counts as a day worked
     const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
+    const absentDays = requiredWorkingDays - effectiveWorkingDays;
 
     // Calculate overtime: only if worked more than required working days
     const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
     const overtimeAmount = overtimeDays * dailyRate * overtimeMultiplier;
 
-    // Half day deduction
+    // Deductions:
+    // 1. Absent days deduction: absent days * dailyRate
+    // 2. Half day deduction: halfDays * (dailyRate * 0.5)
+    const absentDeduction = Math.max(0, absentDays) * dailyRate;
     const halfDayDeduction = halfDays * (dailyRate * 0.5);
+    const totalDeductions = absentDeduction + halfDayDeduction;
 
     // Calculate salaries
-    // Base salary: minimum of (actual days worked, required days) * dailyRate
-    const baseSalary = Math.min(effectiveWorkingDays, requiredWorkingDays) * dailyRate;
+    // Base salary is always full monthly salary
+    const baseSalary = monthlySalary;
     const grossSalary = baseSalary + overtimeAmount;
-    const netSalary = grossSalary - halfDayDeduction;
+    const netSalary = grossSalary - totalDeductions;
 
     return this.payrollEntryRepository.create({
       payrollRunId,
@@ -203,7 +208,7 @@ export class PayrollService {
       halfDaysDeduction: halfDayDeduction,
       halfDayCount: halfDays,
       grossSalary,
-      deductions: 0,
+      deductions: totalDeductions,
       netSalary,
       status: PayrollEntryStatus.PENDING,
     });
