@@ -165,9 +165,9 @@ export class PayrollService {
     const totalDaysInMonth = getDaysInMonth(year, month);
     const mondaysInMonth = getMondaysInMonth(year, month);
 
-    // Required shifts = Total days in month (each day = 1 shift required)
-    // Monday is not a holiday anymore in terms of shift count - employee can work it
-    const requiredShifts = totalDaysInMonth;
+    // Required shifts = Total days - Mondays (Mondays are holidays)
+    // Employee works required shifts to get full salary
+    const requiredShifts = totalDaysInMonth - mondaysInMonth;
 
     // Count ALL attendance records as shifts worked
     // PRESENT and WORKING count as full shift (1.0)
