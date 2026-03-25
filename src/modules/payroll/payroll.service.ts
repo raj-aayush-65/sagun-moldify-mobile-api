@@ -181,23 +181,21 @@ export class PayrollService {
     // Total shifts worked (full + half)
     const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
 
-    // Absent shifts = Required - Worked
-    const absentShifts = requiredShifts - effectiveWorkingShifts;
+    // Pro-rated base salary: (shifts worked / required shifts) × monthly salary
+    // If employee works 0 shifts, they get 0 salary
+    const baseSalary =
+      requiredShifts > 0 ? (effectiveWorkingShifts / requiredShifts) * monthlySalary : 0;
 
     // Calculate overtime: shifts worked beyond required (e.g., working 2 shifts on same day)
     const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
     const overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
 
-    // Deductions:
-    // 1. Absent shifts deduction: absent shifts * dailyRate
-    // 2. Half day deduction: halfDayShifts * (dailyRate * 0.5)
-    const absentDeduction = Math.max(0, absentShifts) * dailyRate;
+    // Deductions for half days (already accounted in effectiveWorkingShifts)
+    // Half day = 0.5 shift worked, so we deduct the other 0.5 from base
     const halfDayDeduction = halfDayShifts * (dailyRate * 0.5);
-    const totalDeductions = absentDeduction + halfDayDeduction;
+    const totalDeductions = halfDayDeduction;
 
     // Calculate salaries
-    // Base salary is always full monthly salary
-    const baseSalary = monthlySalary;
     const grossSalary = baseSalary + overtimeAmount;
     const netSalary = grossSalary - totalDeductions;
 

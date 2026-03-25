@@ -194,30 +194,30 @@ export class PayrollController {
       const dailyRate = monthlySalary / SALARY_DAYS;
 
       const presentDays = attendance.filter(
-        (a: any) => a.status === AttendanceStatus.PRESENT
+        (a: any) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
       ).length;
       const halfDays = attendance.filter((a: any) => a.status === AttendanceStatus.HALF_DAY).length;
-      const workedMonday = attendance.filter(
-        (a: any) => a.status === AttendanceStatus.WORKING
-      ).length;
 
-      // Effective days worked: Present + Worked Monday + (Half days * 0.5)
-      const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
+      // Effective shifts worked: Present + Worked Monday + (Half days * 0.5)
+      const effectiveWorkingShifts = presentDays + halfDays * 0.5;
 
-      // Absent days calculation
-      const absentDays = requiredWorkingDays - effectiveWorkingDays;
+      // Required shifts = Total days - Mondays
+      const requiredShifts = requiredWorkingDays;
 
-      // Calculate overtime: only if worked more than required working days
-      const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
-      const overtimeAmount = overtimeDays * dailyRate * multiplier;
+      // Pro-rated base salary: (shifts worked / required shifts) × monthly salary
+      // If employee works 0 shifts, they get 0 salary
+      const baseSalary =
+        requiredShifts > 0 ? (effectiveWorkingShifts / requiredShifts) * monthlySalary : 0;
 
-      // Deductions: absent days + half days
-      const absentDeduction = Math.max(0, absentDays) * dailyRate;
+      // Calculate overtime: shifts worked beyond required
+      const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
+      const overtimeAmount = overtimeShifts * dailyRate * multiplier;
+
+      // Half day deduction
       const halfDayDeduction = halfDays * (dailyRate * 0.5);
-      const totalDeductions = absentDeduction + halfDayDeduction;
+      const totalDeductions = halfDayDeduction;
 
-      // Base salary is always full monthly salary
-      const baseSalary = monthlySalary;
+      // Calculate net salary
       const netSalary = baseSalary + overtimeAmount - totalDeductions;
 
       return {
@@ -226,10 +226,10 @@ export class PayrollController {
         employeeType: employee.employeeType,
         designation: employee.designation,
         monthlySalary,
-        workingDays: effectiveWorkingDays,
+        workingDays: effectiveWorkingShifts,
         requiredDays: requiredWorkingDays,
         totalDays: totalDaysInMonth,
-        overtimeDays,
+        overtimeDays: overtimeShifts,
         dailyRate,
         baseSalary,
         overtimeAmount,
