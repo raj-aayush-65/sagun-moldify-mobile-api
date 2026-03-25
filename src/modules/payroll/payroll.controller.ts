@@ -201,12 +201,24 @@ export class PayrollController {
         (a: any) => a.status === AttendanceStatus.WORKING
       ).length;
 
+      // Effective days worked: Present + Worked Monday + (Half days * 0.5)
       const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
+
+      // Absent days calculation
+      const absentDays = requiredWorkingDays - effectiveWorkingDays;
+
+      // Calculate overtime: only if worked more than required working days
       const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
       const overtimeAmount = overtimeDays * dailyRate * multiplier;
+
+      // Deductions: absent days + half days
+      const absentDeduction = Math.max(0, absentDays) * dailyRate;
       const halfDayDeduction = halfDays * (dailyRate * 0.5);
-      const baseSalary = Math.min(effectiveWorkingDays, requiredWorkingDays) * dailyRate;
-      const netSalary = baseSalary + overtimeAmount - halfDayDeduction;
+      const totalDeductions = absentDeduction + halfDayDeduction;
+
+      // Base salary is always full monthly salary
+      const baseSalary = monthlySalary;
+      const netSalary = baseSalary + overtimeAmount - totalDeductions;
 
       return {
         employeeId: employee.id,
