@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { AttendanceStatus } from './entities/attendance.entity';
+import { AttendanceStatus, ShiftType } from './entities/attendance.entity';
 
 interface AuthRequest {
   user: {
@@ -67,13 +67,15 @@ export class AttendanceController {
     @Query('employeeId') employeeId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('status') status?: AttendanceStatus
+    @Query('status') status?: AttendanceStatus,
+    @Query('shift') shift?: ShiftType
   ) {
     return this.attendanceService.findAll({
       employeeId,
       startDate,
       endDate,
       status,
+      shift,
     });
   }
 

@@ -165,29 +165,34 @@ export class PayrollService {
     const totalDaysInMonth = getDaysInMonth(year, month);
     const mondaysInMonth = getMondaysInMonth(year, month);
 
-    // Working days = Total days - Mondays (Mondays are holidays by default)
-    const requiredWorkingDays = totalDaysInMonth - mondaysInMonth;
+    // Required shifts = Total days in month (each day = 1 shift required)
+    // Monday is not a holiday anymore in terms of shift count - employee can work it
+    const requiredShifts = totalDaysInMonth;
 
-    // Count different attendance types
-    const presentDays = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
-    const halfDays = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
-    // WORKING status means Monday was worked - it counts as a regular work day
-    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKING).length;
+    // Count ALL attendance records as shifts worked
+    // PRESENT and WORKING count as full shift (1.0)
+    // HALF_DAY counts as half shift (0.5)
+    // ABSENT, LEAVE, HOLIDAY don't count as shifts worked
+    const presentShifts = attendance.filter(
+      a => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
+    ).length;
+    const halfDayShifts = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
 
-    // Absent days: Required days minus (Present + Worked Monday + Half days)
-    // Note: WORKING counts as a day worked
-    const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
-    const absentDays = requiredWorkingDays - effectiveWorkingDays;
+    // Total shifts worked (full + half)
+    const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
 
-    // Calculate overtime: only if worked more than required working days
-    const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
-    const overtimeAmount = overtimeDays * dailyRate * overtimeMultiplier;
+    // Absent shifts = Required - Worked
+    const absentShifts = requiredShifts - effectiveWorkingShifts;
+
+    // Calculate overtime: shifts worked beyond required (e.g., working 2 shifts on same day)
+    const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
+    const overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
 
     // Deductions:
-    // 1. Absent days deduction: absent days * dailyRate
-    // 2. Half day deduction: halfDays * (dailyRate * 0.5)
-    const absentDeduction = Math.max(0, absentDays) * dailyRate;
-    const halfDayDeduction = halfDays * (dailyRate * 0.5);
+    // 1. Absent shifts deduction: absent shifts * dailyRate
+    // 2. Half day deduction: halfDayShifts * (dailyRate * 0.5)
+    const absentDeduction = Math.max(0, absentShifts) * dailyRate;
+    const halfDayDeduction = halfDayShifts * (dailyRate * 0.5);
     const totalDeductions = absentDeduction + halfDayDeduction;
 
     // Calculate salaries
@@ -199,14 +204,14 @@ export class PayrollService {
     return this.payrollEntryRepository.create({
       payrollRunId,
       employeeId: employee.id,
-      workingDays: effectiveWorkingDays,
+      workingDays: effectiveWorkingShifts,
       dailyRate,
       baseSalary,
       overtimeAmount,
-      overtimeDays,
-      overtimeMultiplier: overtimeDays > 0 ? overtimeMultiplier : 0,
+      overtimeDays: overtimeShifts,
+      overtimeMultiplier: overtimeShifts > 0 ? overtimeMultiplier : 0,
       halfDaysDeduction: halfDayDeduction,
-      halfDayCount: halfDays,
+      halfDayCount: halfDayShifts,
       grossSalary,
       deductions: totalDeductions,
       netSalary,

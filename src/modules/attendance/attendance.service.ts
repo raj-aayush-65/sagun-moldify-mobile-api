@@ -35,17 +35,18 @@ export class AttendanceService {
     // Check if employee exists
     await this.employeesService.findOne(createAttendanceDto.employeeId);
 
-    // Check if attendance already exists for this employee and date
+    // Check if attendance already exists for this employee, date, AND shift
     const existingAttendance = await this.attendanceRepository.findOne({
       where: {
         employeeId: createAttendanceDto.employeeId,
         attendanceDate: new Date(createAttendanceDto.attendanceDate),
+        shift: createAttendanceDto.shift || ShiftType.DAY_SHIFT,
       },
     });
 
     if (existingAttendance) {
       throw new BadRequestException(
-        `Attendance already exists for this employee on ${createAttendanceDto.attendanceDate}`
+        `Attendance already exists for this employee on ${createAttendanceDto.attendanceDate} for ${createAttendanceDto.shift || ShiftType.DAY_SHIFT} shift`
       );
     }
 
@@ -316,6 +317,7 @@ export class AttendanceService {
     startDate?: string;
     endDate?: string;
     status?: AttendanceStatus;
+    shift?: ShiftType;
   }): Promise<Attendance[]> {
     const query = this.attendanceRepository
       .createQueryBuilder('attendance')
@@ -336,6 +338,10 @@ export class AttendanceService {
 
     if (filters?.status) {
       query.andWhere('attendance.status = :status', { status: filters.status });
+    }
+
+    if (filters?.shift) {
+      query.andWhere('attendance.shift = :shift', { shift: filters.shift });
     }
 
     return query.orderBy('attendance.attendanceDate', 'DESC').getMany();
@@ -439,7 +445,15 @@ export class AttendanceService {
 
   async checkAttendanceForDate(
     date: string
-  ): Promise<Record<string, { status: string; shift: string; id: string }>> {
+  ): Promise<
+    Record<
+      string,
+      {
+        dayShift: { status: string; id: string } | null;
+        nightShift: { status: string; id: string } | null;
+      }
+    >
+  > {
     // Get all attendance records for the given date
     const attendanceRecords = await this.attendanceRepository.find({
       where: {
@@ -448,15 +462,34 @@ export class AttendanceService {
       select: ['id', 'employeeId', 'status', 'shift'],
     });
 
-    // Convert to a map for efficient lookup
-    const attendanceMap: Record<string, { status: string; shift: string; id: string }> = {};
+    // Convert to a map that supports both shifts per employee
+    const attendanceMap: Record<
+      string,
+      {
+        dayShift: { status: string; id: string } | null;
+        nightShift: { status: string; id: string } | null;
+      }
+    > = {};
 
     for (const record of attendanceRecords) {
-      attendanceMap[record.employeeId] = {
-        status: record.status,
-        shift: record.shift,
-        id: record.id,
-      };
+      if (!attendanceMap[record.employeeId]) {
+        attendanceMap[record.employeeId] = {
+          dayShift: null,
+          nightShift: null,
+        };
+      }
+
+      if (record.shift === ShiftType.DAY_SHIFT) {
+        attendanceMap[record.employeeId].dayShift = {
+          status: record.status,
+          id: record.id,
+        };
+      } else if (record.shift === ShiftType.NIGHT_SHIFT) {
+        attendanceMap[record.employeeId].nightShift = {
+          status: record.status,
+          id: record.id,
+        };
+      }
     }
 
     return attendanceMap;
