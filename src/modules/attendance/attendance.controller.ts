@@ -17,6 +17,7 @@ import {
   BulkAttendanceDto,
   MarkAllPresentDto,
   UpdateAttendanceDto,
+  BulkRangeAttendanceDto,
 } from './dto/create-attendance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -52,6 +53,12 @@ export class AttendanceController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
   markAllPresent(@Body() markAllPresentDto: MarkAllPresentDto, @Request() req: AuthRequest) {
     return this.attendanceService.markAllPresent(markAllPresentDto, req.user.id);
+  }
+
+  @Post('bulk-range')
+  @Roles(UserRole.SUPER_ADMIN)
+  createBulkRange(@Body() bulkRangeDto: BulkRangeAttendanceDto, @Request() req: AuthRequest) {
+    return this.attendanceService.createBulkRange(bulkRangeDto, req.user.id);
   }
 
   @Get()
