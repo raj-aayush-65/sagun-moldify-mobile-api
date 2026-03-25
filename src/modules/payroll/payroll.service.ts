@@ -172,7 +172,6 @@ export class PayrollService {
     // Count ALL attendance records as shifts worked
     // PRESENT and WORKING count as full shift (1.0)
     // HALF_DAY counts as half shift (0.5)
-    // ABSENT, LEAVE, HOLIDAY don't count as shifts worked
     const presentShifts = attendance.filter(
       a => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
     ).length;
@@ -181,17 +180,14 @@ export class PayrollService {
     // Total shifts worked (full + half)
     const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
 
-    // Pro-rated base salary: (shifts worked / required shifts) × monthly salary
-    // If employee works 0 shifts, they get 0 salary
-    const baseSalary =
-      requiredShifts > 0 ? (effectiveWorkingShifts / requiredShifts) * monthlySalary : 0;
+    // Base salary is always full monthly salary
+    const baseSalary = monthlySalary;
 
-    // Calculate overtime: shifts worked beyond required (e.g., working 2 shifts on same day)
+    // Overtime: only paid for extra shifts beyond required
     const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
     const overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
 
-    // Deductions for half days (already accounted in effectiveWorkingShifts)
-    // Half day = 0.5 shift worked, so we deduct the other 0.5 from base
+    // Half day deduction: each half day deducts 0.5 day's pay
     const halfDayDeduction = halfDayShifts * (dailyRate * 0.5);
     const totalDeductions = halfDayDeduction;
 

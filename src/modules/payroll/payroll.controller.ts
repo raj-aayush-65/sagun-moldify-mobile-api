@@ -198,26 +198,21 @@ export class PayrollController {
       ).length;
       const halfDays = attendance.filter((a: any) => a.status === AttendanceStatus.HALF_DAY).length;
 
-      // Effective shifts worked: Present + Worked Monday + (Half days * 0.5)
+      // Effective shifts worked
       const effectiveWorkingShifts = presentDays + halfDays * 0.5;
 
-      // Required shifts = Total days - Mondays
-      const requiredShifts = requiredWorkingDays;
+      // Base salary is always full monthly salary
+      const baseSalary = monthlySalary;
 
-      // Pro-rated base salary: (shifts worked / required shifts) × monthly salary
-      // If employee works 0 shifts, they get 0 salary
-      const baseSalary =
-        requiredShifts > 0 ? (effectiveWorkingShifts / requiredShifts) * monthlySalary : 0;
-
-      // Calculate overtime: shifts worked beyond required
-      const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
+      // Overtime: only paid for extra shifts beyond required
+      const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredWorkingDays);
       const overtimeAmount = overtimeShifts * dailyRate * multiplier;
 
-      // Half day deduction
+      // Half day deduction: each half day deducts 0.5 day's pay
       const halfDayDeduction = halfDays * (dailyRate * 0.5);
       const totalDeductions = halfDayDeduction;
 
-      // Calculate net salary
+      // Net salary = base + overtime - deductions
       const netSalary = baseSalary + overtimeAmount - totalDeductions;
 
       return {
