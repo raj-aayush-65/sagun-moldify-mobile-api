@@ -41,14 +41,18 @@ export class UsersService {
    * Decrypt password if encrypted
    */
   private decryptPassword(password: string): string {
-    try {
-      const parsed = JSON.parse(password);
-      if (parsed.encryptedData && parsed.salt) {
-        const decrypted = this.rsaKeyService.decrypt(parsed.encryptedData);
-        return decrypted + parsed.salt;
+    // Check if it looks like encrypted JSON format
+    if (password.startsWith('{') && password.includes('encryptedData')) {
+      try {
+        const parsed = JSON.parse(password);
+        if (parsed.encryptedData && parsed.salt) {
+          // Decrypt using the full encrypted data (includes salt) - same as auth.service
+          const decrypted = this.rsaKeyService.decrypt(password);
+          return decrypted;
+        }
+      } catch (error) {
+        // Not encrypted, use as-is
       }
-    } catch (error) {
-      // Not encrypted, use as-is
     }
     return password;
   }
