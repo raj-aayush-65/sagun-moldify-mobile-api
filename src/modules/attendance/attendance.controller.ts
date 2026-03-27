@@ -17,12 +17,13 @@ import {
   BulkAttendanceDto,
   MarkAllPresentDto,
   UpdateAttendanceDto,
+  BulkRangeAttendanceDto,
 } from './dto/create-attendance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { AttendanceStatus } from './entities/attendance.entity';
+import { AttendanceStatus, ShiftType } from './entities/attendance.entity';
 
 interface AuthRequest {
   user: {
@@ -54,19 +55,27 @@ export class AttendanceController {
     return this.attendanceService.markAllPresent(markAllPresentDto, req.user.id);
   }
 
+  @Post('bulk-range')
+  @Roles(UserRole.SUPER_ADMIN)
+  createBulkRange(@Body() bulkRangeDto: BulkRangeAttendanceDto, @Request() req: AuthRequest) {
+    return this.attendanceService.createBulkRange(bulkRangeDto, req.user.id);
+  }
+
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
   findAll(
     @Query('employeeId') employeeId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('status') status?: AttendanceStatus
+    @Query('status') status?: AttendanceStatus,
+    @Query('shift') shift?: ShiftType
   ) {
     return this.attendanceService.findAll({
       employeeId,
       startDate,
       endDate,
       status,
+      shift,
     });
   }
 

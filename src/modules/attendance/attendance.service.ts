@@ -7,6 +7,7 @@ import {
   BulkAttendanceDto,
   MarkAllPresentDto,
   UpdateAttendanceDto,
+  BulkRangeAttendanceDto,
 } from './dto/create-attendance.dto';
 import { EmployeesService } from '../employees/employees.service';
 
@@ -34,17 +35,18 @@ export class AttendanceService {
     // Check if employee exists
     await this.employeesService.findOne(createAttendanceDto.employeeId);
 
-    // Check if attendance already exists for this employee and date
+    // Check if attendance already exists for this employee, date, AND shift
     const existingAttendance = await this.attendanceRepository.findOne({
       where: {
         employeeId: createAttendanceDto.employeeId,
         attendanceDate: new Date(createAttendanceDto.attendanceDate),
+        shift: createAttendanceDto.shift || ShiftType.DAY_SHIFT,
       },
     });
 
     if (existingAttendance) {
       throw new BadRequestException(
-        `Attendance already exists for this employee on ${createAttendanceDto.attendanceDate}`
+        `Attendance already exists for this employee on ${createAttendanceDto.attendanceDate} for ${createAttendanceDto.shift || ShiftType.DAY_SHIFT} shift`
       );
     }
 
@@ -174,11 +176,148 @@ export class AttendanceService {
     return count;
   }
 
+  async createBulkRange(
+    bulkRangeDto: BulkRangeAttendanceDto,
+    userId: string
+  ): Promise<{
+    created: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    let created = 0;
+    let skipped = 0;
+
+    // Determine date range based on mode
+    let dates: Date[] = [];
+    const currentDate = new Date();
+
+    if (bulkRangeDto.mode === 'single') {
+      dates = [new Date(bulkRangeDto.startDate)];
+    } else if (bulkRangeDto.mode === 'range') {
+      const start = new Date(bulkRangeDto.startDate);
+      const end = new Date(bulkRangeDto.endDate || bulkRangeDto.startDate);
+
+      // Validate dates are not before 01-11-2025
+      const minDate = new Date('2025-11-01');
+      if (start < minDate || end < minDate) {
+        throw new BadRequestException('Cannot mark attendance before 01-11-2025');
+      }
+
+      // Generate all dates in range
+      const current = new Date(start);
+      while (current <= end) {
+        dates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+    } else if (bulkRangeDto.mode === 'month') {
+      const year = bulkRangeDto.year || currentDate.getFullYear();
+      const month = bulkRangeDto.month || currentDate.getMonth() + 1;
+
+      // Validate month is not before November 2025
+      if (year < 2025 || (year === 2025 && month < 11)) {
+        throw new BadRequestException('Cannot mark attendance before November 2025');
+      }
+
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0);
+
+      const current = new Date(start);
+      while (current <= end) {
+        dates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    // Validate date range is not before 01-11-2025
+    const minDate = new Date('2025-11-01');
+    if (dates.some(d => d < minDate)) {
+      throw new BadRequestException('Cannot mark attendance before 01-11-2025');
+    }
+
+    // Get all employees to process
+    const allEmployees = await this.employeesService.getActiveEmployees();
+
+    // Filter to only include specified employees if provided
+    const employeeIds = bulkRangeDto.employeeIds || [];
+    const employees =
+      employeeIds.length > 0 ? allEmployees.filter(e => employeeIds.includes(e.id)) : allEmployees;
+
+    // Process each employee
+    for (const employee of employees) {
+      // Only process PERMANENT employees
+      if (employee.employeeType !== 'PERMANENT') {
+        continue;
+      }
+
+      // Process each date
+      for (const date of dates) {
+        try {
+          // Check if attendance already exists
+          const existingAttendance = await this.attendanceRepository.findOne({
+            where: {
+              employeeId: employee.id,
+              attendanceDate: date,
+            },
+          });
+
+          if (existingAttendance) {
+            skipped++;
+            continue;
+          }
+
+          // Determine status based on day of week
+          const dayOfWeek = date.getDay();
+          let status: AttendanceStatus;
+          let isHolidayWorked = false;
+
+          if (dayOfWeek === 1) {
+            // Monday - use mondayStatus from DTO
+            status = bulkRangeDto.mondayStatus || AttendanceStatus.HOLIDAY;
+            if (status === AttendanceStatus.PRESENT || status === AttendanceStatus.WORKING) {
+              isHolidayWorked = true;
+            }
+          } else {
+            // Regular day - use workingDayStatus from DTO
+            status = bulkRangeDto.workingDayStatus || AttendanceStatus.PRESENT;
+          }
+
+          const attendance = this.attendanceRepository.create({
+            employeeId: employee.id,
+            attendanceDate: date,
+            status,
+            shift: bulkRangeDto.shift || ShiftType.DAY_SHIFT,
+            isHolidayWorked,
+            createdBy: userId,
+          });
+
+          await this.attendanceRepository.save(attendance);
+          created++;
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            skipped++;
+          } else {
+            errors.push(
+              `Error for employee ${employee.id} on ${date.toISOString().split('T')[0]}: ${error.message}`
+            );
+          }
+        }
+      }
+    }
+
+    return {
+      created,
+      skipped,
+      errors: errors.length > 0 ? errors : [],
+    };
+  }
+
   async findAll(filters?: {
     employeeId?: string;
     startDate?: string;
     endDate?: string;
     status?: AttendanceStatus;
+    shift?: ShiftType;
   }): Promise<Attendance[]> {
     const query = this.attendanceRepository
       .createQueryBuilder('attendance')
@@ -199,6 +338,10 @@ export class AttendanceService {
 
     if (filters?.status) {
       query.andWhere('attendance.status = :status', { status: filters.status });
+    }
+
+    if (filters?.shift) {
+      query.andWhere('attendance.shift = :shift', { shift: filters.shift });
     }
 
     return query.orderBy('attendance.attendanceDate', 'DESC').getMany();
@@ -302,7 +445,15 @@ export class AttendanceService {
 
   async checkAttendanceForDate(
     date: string
-  ): Promise<Record<string, { status: string; shift: string; id: string }>> {
+  ): Promise<
+    Record<
+      string,
+      {
+        dayShift: { status: string; id: string } | null;
+        nightShift: { status: string; id: string } | null;
+      }
+    >
+  > {
     // Get all attendance records for the given date
     const attendanceRecords = await this.attendanceRepository.find({
       where: {
@@ -311,15 +462,34 @@ export class AttendanceService {
       select: ['id', 'employeeId', 'status', 'shift'],
     });
 
-    // Convert to a map for efficient lookup
-    const attendanceMap: Record<string, { status: string; shift: string; id: string }> = {};
+    // Convert to a map that supports both shifts per employee
+    const attendanceMap: Record<
+      string,
+      {
+        dayShift: { status: string; id: string } | null;
+        nightShift: { status: string; id: string } | null;
+      }
+    > = {};
 
     for (const record of attendanceRecords) {
-      attendanceMap[record.employeeId] = {
-        status: record.status,
-        shift: record.shift,
-        id: record.id,
-      };
+      if (!attendanceMap[record.employeeId]) {
+        attendanceMap[record.employeeId] = {
+          dayShift: null,
+          nightShift: null,
+        };
+      }
+
+      if (record.shift === ShiftType.DAY_SHIFT) {
+        attendanceMap[record.employeeId].dayShift = {
+          status: record.status,
+          id: record.id,
+        };
+      } else if (record.shift === ShiftType.NIGHT_SHIFT) {
+        attendanceMap[record.employeeId].nightShift = {
+          status: record.status,
+          id: record.id,
+        };
+      }
     }
 
     return attendanceMap;

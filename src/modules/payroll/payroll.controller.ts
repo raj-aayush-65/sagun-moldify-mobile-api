@@ -194,19 +194,41 @@ export class PayrollController {
       const dailyRate = monthlySalary / SALARY_DAYS;
 
       const presentDays = attendance.filter(
-        (a: any) => a.status === AttendanceStatus.PRESENT
+        (a: any) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
       ).length;
       const halfDays = attendance.filter((a: any) => a.status === AttendanceStatus.HALF_DAY).length;
-      const workedMonday = attendance.filter(
-        (a: any) => a.status === AttendanceStatus.WORKING
-      ).length;
 
-      const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
-      const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
-      const overtimeAmount = overtimeDays * dailyRate * multiplier;
+      // Effective shifts worked
+      const effectiveWorkingShifts = presentDays + halfDays * 0.5;
+
+      // Calculate base salary proportionally based on days worked
+      // If employee works 0 days, salary is 0
+      // If employee works less than required days, salary is proportional
+      // If employee works required days or more, salary is full monthly salary
+      let baseSalary: number;
+      let overtimeAmount = 0;
+      let overtimeShifts = 0;
+
+      if (effectiveWorkingShifts === 0) {
+        // No days worked = no salary
+        baseSalary = 0;
+      } else if (effectiveWorkingShifts < requiredWorkingDays) {
+        // Less than required days = proportional salary
+        baseSalary = (effectiveWorkingShifts / requiredWorkingDays) * monthlySalary;
+      } else {
+        // Required days or more = full salary
+        baseSalary = monthlySalary;
+        // Overtime: only paid for extra shifts beyond required
+        overtimeShifts = effectiveWorkingShifts - requiredWorkingDays;
+        overtimeAmount = overtimeShifts * dailyRate * multiplier;
+      }
+
+      // Half day deduction: each half day deducts 0.5 day's pay
       const halfDayDeduction = halfDays * (dailyRate * 0.5);
-      const baseSalary = Math.min(effectiveWorkingDays, requiredWorkingDays) * dailyRate;
-      const netSalary = baseSalary + overtimeAmount - halfDayDeduction;
+      const totalDeductions = halfDayDeduction;
+
+      // Net salary = base + overtime - deductions
+      const netSalary = baseSalary + overtimeAmount - totalDeductions;
 
       return {
         employeeId: employee.id,
@@ -214,10 +236,10 @@ export class PayrollController {
         employeeType: employee.employeeType,
         designation: employee.designation,
         monthlySalary,
-        workingDays: effectiveWorkingDays,
+        workingDays: effectiveWorkingShifts,
         requiredDays: requiredWorkingDays,
         totalDays: totalDaysInMonth,
-        overtimeDays,
+        overtimeDays: overtimeShifts,
         dailyRate,
         baseSalary,
         overtimeAmount,

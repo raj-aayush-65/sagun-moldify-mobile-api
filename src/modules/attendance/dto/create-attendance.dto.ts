@@ -141,3 +141,41 @@ export class UpdateAttendanceDto {
   @IsOptional()
   cupsRateUnit?: CupsUnit;
 }
+
+export class BulkRangeAttendanceDto {
+  @IsDateString()
+  @IsNotEmpty()
+  startDate: string;
+
+  @IsDateString()
+  @IsOptional()
+  endDate?: string;
+
+  @IsNumber()
+  @IsOptional()
+  month?: number;
+
+  @IsNumber()
+  @IsOptional()
+  year?: number;
+
+  @IsEnum(['single', 'range', 'month'])
+  mode: 'single' | 'range' | 'month';
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  employeeIds?: string[];
+
+  @IsEnum(AttendanceStatus)
+  @IsOptional()
+  mondayStatus?: AttendanceStatus;
+
+  @IsEnum(AttendanceStatus)
+  @IsOptional()
+  workingDayStatus?: AttendanceStatus;
+
+  @IsEnum(ShiftType)
+  @IsOptional()
+  shift?: ShiftType;
+}

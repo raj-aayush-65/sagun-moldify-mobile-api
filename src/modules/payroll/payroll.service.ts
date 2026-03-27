@@ -158,52 +158,71 @@ export class PayrollService {
 
     const monthlySalary = Number(employee.monthlySalary) || 0;
 
-    // Fixed: Use 30 days as divisor as per user requirement
+    // Fixed: Use 30 days as divisor for deduction calculation
     const dailyRate = monthlySalary / SALARY_DAYS;
 
     // Get actual days in the month and Mondays
     const totalDaysInMonth = getDaysInMonth(year, month);
     const mondaysInMonth = getMondaysInMonth(year, month);
 
-    // Working days = Total days - Mondays (Mondays are holidays by default)
-    const requiredWorkingDays = totalDaysInMonth - mondaysInMonth;
+    // Required shifts = Total days - Mondays (Mondays are holidays)
+    // Employee works required shifts to get full salary
+    const requiredShifts = totalDaysInMonth - mondaysInMonth;
 
-    // Count different attendance types
-    const presentDays = attendance.filter(a => a.status === AttendanceStatus.PRESENT).length;
-    const halfDays = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
-    // WORKING status means Monday was worked - it's a regular work day, not extra
-    const workedMonday = attendance.filter(a => a.status === AttendanceStatus.WORKING).length;
+    // Count ALL attendance records as shifts worked
+    // PRESENT and WORKING count as full shift (1.0)
+    // HALF_DAY counts as half shift (0.5)
+    const presentShifts = attendance.filter(
+      a => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
+    ).length;
+    const halfDayShifts = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
 
-    // Effective days worked: Present + Worked Monday + (Half days * 0.5)
-    // Note: WORKING is counted as a regular day, not extra
-    const effectiveWorkingDays = presentDays + workedMonday + halfDays * 0.5;
+    // Total shifts worked (full + half)
+    const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
 
-    // Calculate overtime: only if worked more than required working days
-    const overtimeDays = Math.max(0, effectiveWorkingDays - requiredWorkingDays);
-    const overtimeAmount = overtimeDays * dailyRate * overtimeMultiplier;
+    // Calculate base salary proportionally based on days worked
+    // If employee works 0 days, salary is 0
+    // If employee works less than required days, salary is proportional
+    // If employee works required days or more, salary is full monthly salary
+    let baseSalary: number;
+    let overtimeAmount = 0;
+    let overtimeShifts = 0;
 
-    // Half day deduction
-    const halfDayDeduction = halfDays * (dailyRate * 0.5);
+    if (effectiveWorkingShifts === 0) {
+      // No days worked = no salary
+      baseSalary = 0;
+    } else if (effectiveWorkingShifts < requiredShifts) {
+      // Less than required days = proportional salary
+      baseSalary = (effectiveWorkingShifts / requiredShifts) * monthlySalary;
+    } else {
+      // Required days or more = full salary
+      baseSalary = monthlySalary;
+      // Overtime: only paid for extra shifts beyond required
+      overtimeShifts = effectiveWorkingShifts - requiredShifts;
+      overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
+    }
+
+    // Half day deduction: each half day deducts 0.5 day's pay
+    const halfDayDeduction = halfDayShifts * (dailyRate * 0.5);
+    const totalDeductions = halfDayDeduction;
 
     // Calculate salaries
-    // Base salary: minimum of (actual days worked, required days) * dailyRate
-    const baseSalary = Math.min(effectiveWorkingDays, requiredWorkingDays) * dailyRate;
     const grossSalary = baseSalary + overtimeAmount;
-    const netSalary = grossSalary - halfDayDeduction;
+    const netSalary = grossSalary - totalDeductions;
 
     return this.payrollEntryRepository.create({
       payrollRunId,
       employeeId: employee.id,
-      workingDays: effectiveWorkingDays,
+      workingDays: effectiveWorkingShifts,
       dailyRate,
       baseSalary,
       overtimeAmount,
-      overtimeDays,
-      overtimeMultiplier: overtimeDays > 0 ? overtimeMultiplier : 0,
+      overtimeDays: overtimeShifts,
+      overtimeMultiplier: overtimeShifts > 0 ? overtimeMultiplier : 0,
       halfDaysDeduction: halfDayDeduction,
-      halfDayCount: halfDays,
+      halfDayCount: halfDayShifts,
       grossSalary,
-      deductions: 0,
+      deductions: totalDeductions,
       netSalary,
       status: PayrollEntryStatus.PENDING,
     });

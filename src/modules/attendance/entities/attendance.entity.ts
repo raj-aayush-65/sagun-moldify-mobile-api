@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Employee } from '../../employees/entities/employee.entity';
 
@@ -30,6 +31,7 @@ export enum CupsUnit {
 }
 
 @Entity('attendance')
+@Index(['employeeId', 'attendanceDate', 'shift'], { unique: true })
 export class Attendance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
