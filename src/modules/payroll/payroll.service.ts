@@ -180,12 +180,27 @@ export class PayrollService {
     // Total shifts worked (full + half)
     const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
 
-    // Base salary is always full monthly salary
-    const baseSalary = monthlySalary;
+    // Calculate base salary proportionally based on days worked
+    // If employee works 0 days, salary is 0
+    // If employee works less than required days, salary is proportional
+    // If employee works required days or more, salary is full monthly salary
+    let baseSalary: number;
+    let overtimeAmount = 0;
+    let overtimeShifts = 0;
 
-    // Overtime: only paid for extra shifts beyond required
-    const overtimeShifts = Math.max(0, effectiveWorkingShifts - requiredShifts);
-    const overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
+    if (effectiveWorkingShifts === 0) {
+      // No days worked = no salary
+      baseSalary = 0;
+    } else if (effectiveWorkingShifts < requiredShifts) {
+      // Less than required days = proportional salary
+      baseSalary = (effectiveWorkingShifts / requiredShifts) * monthlySalary;
+    } else {
+      // Required days or more = full salary
+      baseSalary = monthlySalary;
+      // Overtime: only paid for extra shifts beyond required
+      overtimeShifts = effectiveWorkingShifts - requiredShifts;
+      overtimeAmount = overtimeShifts * dailyRate * overtimeMultiplier;
+    }
 
     // Half day deduction: each half day deducts 0.5 day's pay
     const halfDayDeduction = halfDayShifts * (dailyRate * 0.5);
