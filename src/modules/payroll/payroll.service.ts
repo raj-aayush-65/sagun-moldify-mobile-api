@@ -170,15 +170,18 @@ export class PayrollService {
     const requiredShifts = totalDaysInMonth - mondaysInMonth;
 
     // Count ALL attendance records as shifts worked
-    // PRESENT and WORKING count as full shift (1.0)
+    // PRESENT, WORKING (Monday holiday worked), and HOLIDAY (company holiday) count as full shift (1.0)
     // HALF_DAY counts as half shift (0.5)
-    const presentShifts = attendance.filter(
-      a => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
+    const fullDayShifts = attendance.filter(
+      a =>
+        a.status === AttendanceStatus.PRESENT ||
+        a.status === AttendanceStatus.WORKING ||
+        a.status === AttendanceStatus.HOLIDAY
     ).length;
     const halfDayShifts = attendance.filter(a => a.status === AttendanceStatus.HALF_DAY).length;
 
     // Total shifts worked (full + half)
-    const effectiveWorkingShifts = presentShifts + halfDayShifts * 0.5;
+    const effectiveWorkingShifts = fullDayShifts + halfDayShifts * 0.5;
 
     // Calculate base salary proportionally based on days worked
     // If employee works 0 days, salary is 0
