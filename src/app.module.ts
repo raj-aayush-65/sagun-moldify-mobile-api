@@ -8,6 +8,8 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { HealthModule } from './modules/health/health.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     PayrollModule,
     HealthModule,
     DashboardModule,
+    ExpensesModule,
+    AccountsModule,
   ],
   controllers: [],
   providers: [],

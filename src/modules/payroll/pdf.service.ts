@@ -3,12 +3,27 @@ import * as PDFDocument from 'pdfkit';
 import { PayrollEntry } from './entities/payroll-entry.entity';
 import { Employee } from '../employees/entities/employee.entity';
 
+export interface PayslipAdvanceItem {
+  expenseId: string;
+  expenseDate: Date | string;
+  amount: number;
+  description: string;
+}
+
+export interface PayslipAdvanceData {
+  advances: PayslipAdvanceItem[];
+  advancesSubtotal: number;
+  carryForwardIn: number;
+  carryForwardOut: number;
+}
+
 @Injectable()
 export class PdfService {
   async generatePayslip(
     payrollEntry: PayrollEntry & { employee?: Employee },
     month: number,
-    year: number
+    year: number,
+    advanceData?: PayslipAdvanceData
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
@@ -144,15 +159,38 @@ export class PdfService {
           },
         ];
 
-        if (payrollEntry.deductions > 0) {
+        // Add carry-forward from previous month if applicable
+        if (advanceData && advanceData.carryForwardIn > 0) {
           deductions.push({
-            description: 'Other Deductions',
+            description: 'Carry-forward from previous month',
             rate: '-',
-            amount: Number(payrollEntry.deductions),
+            amount: advanceData.carryForwardIn,
+          });
+        }
+
+        // Add individual Employee Advance line items
+        if (advanceData && advanceData.advances.length > 0) {
+          advanceData.advances.forEach(advance => {
+            const dateStr = typeof advance.expenseDate === 'string'
+              ? advance.expenseDate.substring(0, 10)
+              : new Date(advance.expenseDate).toISOString().split('T')[0];
+            deductions.push({
+              description: `Advance (${dateStr}): ${advance.description}`,
+              rate: '-',
+              amount: advance.amount,
+            });
+          });
+
+          // Add Total Advances Deducted row
+          deductions.push({
+            description: 'Total Advances Deducted',
+            rate: '-',
+            amount: advanceData.advancesSubtotal,
           });
         }
 
         doc.font('Helvetica').fontSize(10);
+        y = doc.y;
         deductions.forEach(item => {
           doc.text(item.description, 55, y, { width: 200 });
           doc.text(item.rate, 280, y, { width: 100 });
@@ -183,6 +221,17 @@ export class PdfService {
         });
 
         doc.moveDown(4);
+
+        // Carry-forward to next month footer note
+        if (advanceData && advanceData.carryForwardOut > 0) {
+          doc.moveDown(1);
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#333333');
+          doc.text(
+            `Note: ₹${advanceData.carryForwardOut.toFixed(2)} carried forward to next month (advance exceeds salary).`,
+            { align: 'center' }
+          );
+          doc.moveDown(1);
+        }
 
         // Footer
         doc.fontSize(8).font('Helvetica').fillColor('#666666');
