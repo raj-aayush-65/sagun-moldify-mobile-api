@@ -16,6 +16,7 @@ import { ExpenseType } from './enums/expense-type.enum';
 import { ExpenseCategory } from './enums/expense-category.enum';
 import { AccountType } from '../accounts/enums/account-type.enum';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { AccountBalanceService } from './account-balance.service';
 
 interface CreateExpenseInput {
   amount: number;
@@ -81,6 +82,7 @@ export class ExpensesService {
     private readonly payrollRunRepository: Repository<PayrollRun>,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly accountBalanceService: AccountBalanceService,
   ) {}
 
   /**
@@ -130,20 +132,44 @@ export class ExpensesService {
       await this.checkPayrollLock(input.expenseDate);
     }
 
-    // Create the expense
-    const expense = this.expenseRepository.create({
-      amount: input.amount,
-      description: input.description.trim(),
-      expenseDate: new Date(input.expenseDate),
-      expenseType: input.expenseType,
-      category,
-      accountId: input.accountId || undefined,
-      employeeId: input.employeeId || undefined,
-      notes: input.notes || undefined,
-      createdBy: user.id,
-    } as Partial<Expense>);
+    // Create the expense using a transaction to atomically update account balance
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    return this.expenseRepository.save(expense);
+    try {
+      const expense = queryRunner.manager.create(Expense, {
+        amount: input.amount,
+        description: input.description.trim(),
+        expenseDate: new Date(input.expenseDate),
+        expenseType: input.expenseType,
+        category,
+        accountId: input.accountId || undefined,
+        employeeId: input.employeeId || undefined,
+        notes: input.notes || undefined,
+        createdBy: user.id,
+      } as Partial<Expense>);
+
+      const savedExpense = await queryRunner.manager.save(Expense, expense);
+
+      // Update account balance if accountId is provided
+      if (savedExpense.accountId) {
+        await this.accountBalanceService.applyExpenseImpact(savedExpense, queryRunner);
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Return with relations
+      return this.expenseRepository.findOne({
+        where: { id: savedExpense.id },
+        relations: ['account', 'employee'],
+      }) as Promise<Expense>;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
@@ -267,11 +293,30 @@ export class ExpensesService {
       await this.checkPayrollLock(dateStr);
     }
 
-    // Stamp soft-delete fields
-    expense.deletedAt = new Date();
-    expense.deletedBy = user.id;
+    // Use transaction to reverse balance and soft-delete atomically
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    return this.expenseRepository.save(expense);
+    try {
+      // Reverse account balance if accountId exists
+      if (expense.accountId) {
+        await this.accountBalanceService.reverseExpenseImpact(expense, queryRunner);
+      }
+
+      // Stamp soft-delete fields
+      expense.deletedAt = new Date();
+      expense.deletedBy = user.id;
+      await queryRunner.manager.save(Expense, expense);
+
+      await queryRunner.commitTransaction();
+      return expense;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**

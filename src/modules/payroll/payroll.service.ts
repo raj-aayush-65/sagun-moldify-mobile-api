@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { PayrollRun, PayrollStatus } from './entities/payroll-run.entity';
@@ -8,6 +8,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { Employee, EmployeeType } from '../employees/entities/employee.entity';
 import { AttendanceStatus } from '../attendance/entities/attendance.entity';
 import { User } from '../users/entities/user.entity';
+import { PayrollIntegrationService } from '../expenses/payroll-integration.service';
 
 // Default overtime multiplier
 const DEFAULT_OVERTIME_MULTIPLIER = 1.5;
@@ -40,7 +41,9 @@ export class PayrollService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private employeesService: EmployeesService,
-    private attendanceService: AttendanceService
+    private attendanceService: AttendanceService,
+    @Inject(forwardRef(() => PayrollIntegrationService))
+    private payrollIntegrationService: PayrollIntegrationService,
   ) {}
 
   async runPayroll(
@@ -105,6 +108,41 @@ export class PayrollService {
 
     // Save all entries
     await this.payrollEntryRepository.save(entries);
+
+    // Apply employee advance deductions to each entry
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    for (const entry of entries) {
+      const monthAdvanceTotal = await this.payrollIntegrationService.computeMonthAdvanceTotal(
+        entry.employeeId,
+        monthStr,
+      );
+
+      if (monthAdvanceTotal > 0) {
+        const carryForwardIn = await this.payrollIntegrationService.getCarryForwardIn(
+          entry.employeeId,
+          monthStr,
+        );
+
+        const totalDeduction = monthAdvanceTotal + carryForwardIn;
+        const grossSalary = Number(entry.grossSalary);
+
+        entry.advancesDeducted = totalDeduction;
+        entry.carryForwardIn = carryForwardIn;
+
+        if (totalDeduction > grossSalary) {
+          entry.carryForwardOut = totalDeduction - grossSalary;
+          entry.deductions = Number(entry.halfDaysDeduction) + totalDeduction;
+          entry.netSalary = 0;
+        } else {
+          entry.carryForwardOut = 0;
+          entry.deductions = Number(entry.halfDaysDeduction) + totalDeduction;
+          entry.netSalary = grossSalary - entry.deductions;
+          if (entry.netSalary < 0) entry.netSalary = 0;
+        }
+
+        await this.payrollEntryRepository.save(entry);
+      }
+    }
 
     return this.findPayrollRun(savedRun.id);
   }
