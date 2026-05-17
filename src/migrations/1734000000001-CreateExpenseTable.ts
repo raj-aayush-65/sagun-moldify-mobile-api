@@ -55,16 +55,16 @@ export class CreateExpenseTable1734000000001 implements MigrationInterface {
 
     // Create indexes
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_expense_date" ON "expense"("expense_date");`,
+      `CREATE INDEX IF NOT EXISTS "idx_expense_date" ON "expense"("expense_date");`
     );
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_expense_type_date" ON "expense"("expense_type", "expense_date");`,
+      `CREATE INDEX IF NOT EXISTS "idx_expense_type_date" ON "expense"("expense_type", "expense_date");`
     );
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_expense_employee_date" ON "expense"("employee_id", "expense_date");`,
+      `CREATE INDEX IF NOT EXISTS "idx_expense_employee_date" ON "expense"("employee_id", "expense_date");`
     );
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_expense_account" ON "expense"("account_id");`,
+      `CREATE INDEX IF NOT EXISTS "idx_expense_account" ON "expense"("account_id");`
     );
   }
 

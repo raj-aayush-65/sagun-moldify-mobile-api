@@ -109,146 +109,161 @@ export class PayrollController {
     const mondaysInMonth = getMondaysInMonth(yearNum, monthNum);
     const requiredWorkingDays = totalDaysInMonth - mondaysInMonth;
 
-    const previews = employees.map(employee => {
-      const attendance = allAttendance.filter((a: any) => a.employeeId === employee.id);
+    const previews = await Promise.all(
+      employees.map(async employee => {
+        const attendance = allAttendance.filter((a: any) => a.employeeId === employee.id);
 
-      // Handle different employee types
-      if (employee.employeeType === 'PICKER') {
-        // For Picker employees - calculate based on cups worked
-        let totalEarnings = 0;
-        let totalCups = 0;
-        let visits = 0;
+        // Handle different employee types
+        if (employee.employeeType === 'PICKER') {
+          // For Picker employees - calculate based on cups worked
+          let totalEarnings = 0;
+          let totalCups = 0;
+          let visits = 0;
 
-        attendance.forEach((a: any) => {
-          if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
-            visits++;
-            if (a.cupsCount && a.cupsRate) {
-              const earnings = calculatePickerEarnings(
-                a.cupsCount,
-                a.cupsUnit,
-                a.cupsRate,
-                a.cupsRateUnit
-              );
-              totalEarnings += earnings;
-              totalCups += a.cupsCount;
+          attendance.forEach((a: any) => {
+            if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
+              visits++;
+              if (a.cupsCount && a.cupsRate) {
+                const earnings = calculatePickerEarnings(
+                  a.cupsCount,
+                  a.cupsUnit,
+                  a.cupsRate,
+                  a.cupsRateUnit
+                );
+                totalEarnings += earnings;
+                totalCups += a.cupsCount;
+              }
             }
-          }
-        });
+          });
+
+          return {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeeType: employee.employeeType,
+            designation: employee.designation,
+            monthlySalary: 0,
+            workingDays: visits,
+            requiredDays: requiredWorkingDays,
+            totalDays: totalDaysInMonth,
+            overtimeDays: 0,
+            dailyRate: 0,
+            baseSalary: totalEarnings,
+            overtimeAmount: 0,
+            netSalary: totalEarnings,
+            multiplier: 0,
+            advancesDeducted: 0,
+            // Additional picker-specific fields
+            cupsWorked: totalCups,
+            pickerEarnings: totalEarnings,
+          };
+        }
+
+        if (employee.employeeType === 'OCCASIONAL') {
+          // For Occasional employees - calculate based on visits
+          let totalEarnings = 0;
+          let visits = 0;
+
+          attendance.forEach((a: any) => {
+            if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
+              visits++;
+              if (a.perVisitRate) {
+                totalEarnings += a.perVisitRate;
+              }
+            }
+          });
+
+          return {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeeType: employee.employeeType,
+            designation: employee.designation,
+            monthlySalary: 0,
+            workingDays: visits,
+            requiredDays: requiredWorkingDays,
+            totalDays: totalDaysInMonth,
+            overtimeDays: 0,
+            dailyRate: 0,
+            baseSalary: totalEarnings,
+            overtimeAmount: 0,
+            netSalary: totalEarnings,
+            multiplier: 0,
+            advancesDeducted: 0,
+            // Additional occasional-specific fields
+            visits,
+            occasionalEarnings: totalEarnings,
+          };
+        }
+
+        // For Permanent employees - calculate based on monthly salary and attendance
+        const monthlySalary = Number(employee.monthlySalary) || 0;
+        const dailyRate = monthlySalary / SALARY_DAYS;
+
+        const presentDays = attendance.filter(
+          (a: any) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
+        ).length;
+        const halfDays = attendance.filter(
+          (a: any) => a.status === AttendanceStatus.HALF_DAY
+        ).length;
+
+        // Effective shifts worked
+        const effectiveWorkingShifts = presentDays + halfDays * 0.5;
+
+        // Calculate base salary proportionally based on days worked
+        let baseSalary: number;
+        let overtimeAmount = 0;
+        let overtimeShifts = 0;
+
+        if (effectiveWorkingShifts === 0) {
+          baseSalary = 0;
+        } else if (effectiveWorkingShifts < requiredWorkingDays) {
+          baseSalary = (effectiveWorkingShifts / requiredWorkingDays) * monthlySalary;
+        } else {
+          baseSalary = monthlySalary;
+          overtimeShifts = effectiveWorkingShifts - requiredWorkingDays;
+          overtimeAmount = overtimeShifts * dailyRate * multiplier;
+        }
+
+        // Half day deduction
+        const halfDayDeduction = halfDays * (dailyRate * 0.5);
+
+        // Fetch employee advance total for this month
+        const monthStr = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+        const advanceTotal = await this.payrollIntegrationService.computeMonthAdvanceTotal(
+          employee.id,
+          monthStr
+        );
+        const carryForwardIn = await this.payrollIntegrationService.getCarryForwardIn(
+          employee.id,
+          monthStr
+        );
+        const totalAdvanceDeduction = advanceTotal + carryForwardIn;
+
+        // Total deductions = half day + advances
+        const totalDeductions = halfDayDeduction + totalAdvanceDeduction;
+
+        // Net salary = base + overtime - deductions (clamped to 0)
+        const grossSalary = baseSalary + overtimeAmount;
+        const netSalary = Math.max(0, grossSalary - totalDeductions);
 
         return {
           employeeId: employee.id,
           employeeName: employee.name,
           employeeType: employee.employeeType,
           designation: employee.designation,
-          monthlySalary: 0,
-          workingDays: visits,
+          monthlySalary,
+          workingDays: effectiveWorkingShifts,
           requiredDays: requiredWorkingDays,
           totalDays: totalDaysInMonth,
-          overtimeDays: 0,
-          dailyRate: 0,
-          baseSalary: totalEarnings,
-          overtimeAmount: 0,
-          netSalary: totalEarnings,
-          multiplier: 0,
-          // Additional picker-specific fields
-          cupsWorked: totalCups,
-          pickerEarnings: totalEarnings,
+          overtimeDays: overtimeShifts,
+          dailyRate,
+          baseSalary,
+          overtimeAmount,
+          netSalary,
+          multiplier,
+          advancesDeducted: totalAdvanceDeduction,
         };
-      }
-
-      if (employee.employeeType === 'OCCASIONAL') {
-        // For Occasional employees - calculate based on visits
-        let totalEarnings = 0;
-        let visits = 0;
-
-        attendance.forEach((a: any) => {
-          if (a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING) {
-            visits++;
-            if (a.perVisitRate) {
-              totalEarnings += a.perVisitRate;
-            }
-          }
-        });
-
-        return {
-          employeeId: employee.id,
-          employeeName: employee.name,
-          employeeType: employee.employeeType,
-          designation: employee.designation,
-          monthlySalary: 0,
-          workingDays: visits,
-          requiredDays: requiredWorkingDays,
-          totalDays: totalDaysInMonth,
-          overtimeDays: 0,
-          dailyRate: 0,
-          baseSalary: totalEarnings,
-          overtimeAmount: 0,
-          netSalary: totalEarnings,
-          multiplier: 0,
-          // Additional occasional-specific fields
-          visits,
-          occasionalEarnings: totalEarnings,
-        };
-      }
-
-      // For Permanent employees - calculate based on monthly salary and attendance
-      const monthlySalary = Number(employee.monthlySalary) || 0;
-      const dailyRate = monthlySalary / SALARY_DAYS;
-
-      const presentDays = attendance.filter(
-        (a: any) => a.status === AttendanceStatus.PRESENT || a.status === AttendanceStatus.WORKING
-      ).length;
-      const halfDays = attendance.filter((a: any) => a.status === AttendanceStatus.HALF_DAY).length;
-
-      // Effective shifts worked
-      const effectiveWorkingShifts = presentDays + halfDays * 0.5;
-
-      // Calculate base salary proportionally based on days worked
-      // If employee works 0 days, salary is 0
-      // If employee works less than required days, salary is proportional
-      // If employee works required days or more, salary is full monthly salary
-      let baseSalary: number;
-      let overtimeAmount = 0;
-      let overtimeShifts = 0;
-
-      if (effectiveWorkingShifts === 0) {
-        // No days worked = no salary
-        baseSalary = 0;
-      } else if (effectiveWorkingShifts < requiredWorkingDays) {
-        // Less than required days = proportional salary
-        baseSalary = (effectiveWorkingShifts / requiredWorkingDays) * monthlySalary;
-      } else {
-        // Required days or more = full salary
-        baseSalary = monthlySalary;
-        // Overtime: only paid for extra shifts beyond required
-        overtimeShifts = effectiveWorkingShifts - requiredWorkingDays;
-        overtimeAmount = overtimeShifts * dailyRate * multiplier;
-      }
-
-      // Half day deduction: each half day deducts 0.5 day's pay
-      const halfDayDeduction = halfDays * (dailyRate * 0.5);
-      const totalDeductions = halfDayDeduction;
-
-      // Net salary = base + overtime - deductions
-      const netSalary = baseSalary + overtimeAmount - totalDeductions;
-
-      return {
-        employeeId: employee.id,
-        employeeName: employee.name,
-        employeeType: employee.employeeType,
-        designation: employee.designation,
-        monthlySalary,
-        workingDays: effectiveWorkingShifts,
-        requiredDays: requiredWorkingDays,
-        totalDays: totalDaysInMonth,
-        overtimeDays: overtimeShifts,
-        dailyRate,
-        baseSalary,
-        overtimeAmount,
-        netSalary,
-        multiplier,
-      };
-    });
+      })
+    );
 
     return {
       year: yearNum,

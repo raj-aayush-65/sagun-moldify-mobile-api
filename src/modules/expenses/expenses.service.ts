@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  HttpException,
-  HttpStatus,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -82,7 +77,7 @@ export class ExpensesService {
     private readonly payrollRunRepository: Repository<PayrollRun>,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
-    private readonly accountBalanceService: AccountBalanceService,
+    private readonly accountBalanceService: AccountBalanceService
   ) {}
 
   /**
@@ -113,7 +108,7 @@ export class ExpensesService {
             message: 'Employee ID is required for Employee Advance expenses',
             data: { code: 'EMPLOYEE_REQUIRED_FOR_ADVANCE' },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
       await this.validateEmployee(input.employeeId);
@@ -175,11 +170,7 @@ export class ExpensesService {
   /**
    * Update an existing expense with permission and validation checks
    */
-  async update(
-    id: string,
-    input: UpdateExpenseInput,
-    user: AuthenticatedUser,
-  ): Promise<Expense> {
+  async update(id: string, input: UpdateExpenseInput, user: AuthenticatedUser): Promise<Expense> {
     const expense = await this.findOneOrFail(id);
 
     // Permission check
@@ -188,7 +179,8 @@ export class ExpensesService {
     // Determine the effective values after update
     const effectiveExpenseType = input.expenseType ?? expense.expenseType;
     const effectiveExpenseDate = input.expenseDate ?? this.dateToISOString(expense.expenseDate);
-    const effectiveEmployeeId = input.employeeId !== undefined ? input.employeeId : expense.employeeId;
+    const effectiveEmployeeId =
+      input.employeeId !== undefined ? input.employeeId : expense.employeeId;
     const effectiveAccountId = input.accountId !== undefined ? input.accountId : expense.accountId;
 
     // Validate fields if provided
@@ -211,7 +203,10 @@ export class ExpensesService {
     // Resolve category
     let effectiveCategory = expense.category;
     if (input.category !== undefined || input.expenseType !== undefined) {
-      effectiveCategory = this.resolveCategory(effectiveExpenseType, input.category ?? expense.category);
+      effectiveCategory = this.resolveCategory(
+        effectiveExpenseType,
+        input.category ?? expense.category
+      );
     }
 
     // Validate employee for EMPLOYEE_ADVANCE
@@ -223,7 +218,7 @@ export class ExpensesService {
             message: 'Employee ID is required for Employee Advance expenses',
             data: { code: 'EMPLOYEE_REQUIRED_FOR_ADVANCE' },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
       await this.validateEmployee(effectiveEmployeeId);
@@ -268,7 +263,8 @@ export class ExpensesService {
     expense.expenseType = effectiveExpenseType;
     expense.category = effectiveCategory;
     if (input.accountId !== undefined) expense.accountId = (input.accountId || undefined) as string;
-    if (input.employeeId !== undefined) expense.employeeId = (input.employeeId || undefined) as string;
+    if (input.employeeId !== undefined)
+      expense.employeeId = (input.employeeId || undefined) as string;
     if (input.notes !== undefined) expense.notes = (input.notes || undefined) as string;
 
     // Stamp audit fields
@@ -334,7 +330,7 @@ export class ExpensesService {
    */
   async findAll(
     query: FindAllExpensesQuery,
-    user: AuthenticatedUser,
+    user: AuthenticatedUser
   ): Promise<FindAllExpensesResult> {
     // Validate pagination parameters
     const page = query.page ?? 1;
@@ -347,7 +343,7 @@ export class ExpensesService {
           message: 'Page must be a positive integer >= 1',
           data: { code: 'INVALID_PAGE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -358,7 +354,7 @@ export class ExpensesService {
           message: 'Page size must be an integer between 1 and 100',
           data: { code: 'INVALID_PAGE_SIZE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -501,7 +497,7 @@ export class ExpensesService {
    */
   async getSummary(
     monthParam: string | undefined,
-    user: AuthenticatedUser,
+    user: AuthenticatedUser
   ): Promise<{
     month: string;
     monthTotal: number;
@@ -535,9 +531,12 @@ export class ExpensesService {
       baseQb.andWhere('expense.accountId IS NOT NULL');
     }
 
-    // Get monthTotal and expenseCount
+    // Get monthTotal and expenseCount (EXCLUDE EMPLOYEE_ADVANCE - shown separately on dashboard)
     const summaryResult = await baseQb
       .clone()
+      .andWhere('expense.expenseType != :advanceType', {
+        advanceType: ExpenseType.EMPLOYEE_ADVANCE,
+      })
       .select('COALESCE(SUM(expense.amount), 0)', 'monthTotal')
       .addSelect('COUNT(expense.id)', 'expenseCount')
       .getRawOne();
@@ -611,7 +610,7 @@ export class ExpensesService {
   async createRefund(
     expenseId: string,
     dto: { amount: number; refundDate: string; description: string },
-    userId: string,
+    userId: string
   ): Promise<Refund> {
     // Find the expense (reject if not found or soft-deleted)
     const expense = await this.expenseRepository.findOne({
@@ -625,7 +624,7 @@ export class ExpensesService {
           message: 'Expense not found',
           data: { code: 'EXPENSE_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -636,7 +635,7 @@ export class ExpensesService {
           message: 'Cannot refund a deleted expense',
           data: { code: 'EXPENSE_DELETED' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -660,7 +659,7 @@ export class ExpensesService {
             details: { remaining },
           },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -702,7 +701,7 @@ export class ExpensesService {
             // Asset account: INCREMENT currentBalance (money coming back)
             await queryRunner.query(
               `UPDATE account SET current_balance = current_balance + $1 WHERE id = $2`,
-              [refundAmount, account.id],
+              [refundAmount, account.id]
             );
           } else if (
             account.accountType === AccountType.CREDIT_CARD ||
@@ -711,7 +710,7 @@ export class ExpensesService {
             // Liability account: DECREMENT currentOutstanding (reducing what's owed)
             await queryRunner.query(
               `UPDATE account SET current_outstanding = current_outstanding - $1 WHERE id = $2`,
-              [refundAmount, account.id],
+              [refundAmount, account.id]
             );
           }
         }
@@ -743,7 +742,7 @@ export class ExpensesService {
           message: 'Expense not found',
           data: { code: 'EXPENSE_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -763,7 +762,7 @@ export class ExpensesService {
           message: 'Amount is required',
           data: { code: 'INVALID_AMOUNT' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -774,7 +773,7 @@ export class ExpensesService {
           message: 'Amount must be greater than 0',
           data: { code: 'INVALID_AMOUNT' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -785,7 +784,7 @@ export class ExpensesService {
           message: 'Amount must not exceed 99,999,999.99',
           data: { code: 'INVALID_AMOUNT' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -801,7 +800,7 @@ export class ExpensesService {
             message: 'Amount must have at most 2 decimal places',
             data: { code: 'INVALID_AMOUNT' },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
     }
@@ -815,7 +814,7 @@ export class ExpensesService {
           message: 'Description is required and cannot be empty or whitespace only',
           data: { code: 'DESCRIPTION_REQUIRED' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -827,7 +826,7 @@ export class ExpensesService {
           message: 'Description must be between 1 and 500 characters after trimming',
           data: { code: 'DESCRIPTION_REQUIRED' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -841,7 +840,7 @@ export class ExpensesService {
           message: 'Invalid expense date',
           data: { code: 'INVALID_EXPENSE_DATE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -860,7 +859,7 @@ export class ExpensesService {
           message: 'Expense date cannot be more than 1 day in the future',
           data: { code: 'INVALID_EXPENSE_DATE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -875,7 +874,7 @@ export class ExpensesService {
           message: 'Expense date cannot be more than 5 years in the past',
           data: { code: 'INVALID_EXPENSE_DATE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -888,15 +887,12 @@ export class ExpensesService {
           message: 'Invalid expense type',
           data: { code: 'INVALID_EXPENSE_TYPE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
 
-  private resolveCategory(
-    expenseType: ExpenseType,
-    category?: ExpenseCategory,
-  ): ExpenseCategory {
+  private resolveCategory(expenseType: ExpenseType, category?: ExpenseCategory): ExpenseCategory {
     // EMPLOYEE_ADVANCE auto-sets category to SALARY_ADVANCE if not provided
     if (expenseType === ExpenseType.EMPLOYEE_ADVANCE) {
       if (!category) {
@@ -911,7 +907,7 @@ export class ExpensesService {
           message: 'Invalid expense category',
           data: { code: 'INVALID_CATEGORY' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -923,7 +919,7 @@ export class ExpensesService {
           message: 'Category is required for general expenses',
           data: { code: 'INVALID_CATEGORY' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -942,7 +938,7 @@ export class ExpensesService {
           message: 'Employee not found',
           data: { code: 'EMPLOYEE_REQUIRED_FOR_ADVANCE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -954,7 +950,7 @@ export class ExpensesService {
           message: 'Employee is inactive or archived',
           data: { code: 'EMPLOYEE_INACTIVE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -971,7 +967,7 @@ export class ExpensesService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -983,7 +979,7 @@ export class ExpensesService {
           message: 'LOAN accounts cannot be used for expenses',
           data: { code: 'ACCOUNT_TYPE_NOT_EXPENSABLE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -999,7 +995,7 @@ export class ExpensesService {
           message: 'Account is required for expenses',
           data: { code: 'ACCOUNT_REQUIRED' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
   }
@@ -1014,7 +1010,7 @@ export class ExpensesService {
             message: 'Cannot modify a deleted expense',
             data: { code: 'EXPENSE_DELETED' },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
       return;
@@ -1029,7 +1025,7 @@ export class ExpensesService {
             message: 'Cannot modify a deleted expense',
             data: { code: 'EXPENSE_DELETED' },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
 
@@ -1040,7 +1036,7 @@ export class ExpensesService {
             message: 'You can only modify your own expenses',
             data: { code: 'EXPENSE_NOT_OWNED' },
           },
-          HttpStatus.FORBIDDEN,
+          HttpStatus.FORBIDDEN
         );
       }
       return;
@@ -1080,7 +1076,7 @@ export class ExpensesService {
             details: { lockedMonth },
           },
         },
-        HttpStatus.CONFLICT,
+        HttpStatus.CONFLICT
       );
     }
   }
@@ -1097,7 +1093,7 @@ export class ExpensesService {
           message: 'Expense not found',
           data: { code: 'EXPENSE_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 

@@ -40,7 +40,13 @@ export class Account {
   @Column({ name: 'overdraft_limit', type: 'decimal', precision: 14, scale: 2, nullable: true })
   overdraftLimit: number;
 
-  @Column({ name: 'principal_outstanding', type: 'decimal', precision: 14, scale: 2, nullable: true })
+  @Column({
+    name: 'principal_outstanding',
+    type: 'decimal',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+  })
   principalOutstanding: number;
 
   @Column({ type: 'text', nullable: true })

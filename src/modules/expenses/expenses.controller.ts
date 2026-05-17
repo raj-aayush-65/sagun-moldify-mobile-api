@@ -30,14 +30,14 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class ExpensesController {
   constructor(
     private readonly expensesService: ExpensesService,
-    private readonly payrollIntegrationService: PayrollIntegrationService,
+    private readonly payrollIntegrationService: PayrollIntegrationService
   ) {}
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   async create(
     @Body() createExpenseDto: CreateExpenseDto,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     const expense = await this.expensesService.create(createExpenseDto, {
       id: user.id,
@@ -51,7 +51,7 @@ export class ExpensesController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   async findAll(
     @Query() query: ExpenseQueryDto,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     const result = await this.expensesService.findAll(
       {
@@ -69,7 +69,7 @@ export class ExpensesController {
         id: user.id,
         role: user.role,
         isSuperAdmin: user.role === UserRole.SUPER_ADMIN,
-      },
+      }
     );
     return ApiResponseDto.success('Expenses fetched successfully', result);
   }
@@ -78,7 +78,7 @@ export class ExpensesController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   async getSummary(
     @Query('month') month: string | undefined,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     const summary = await this.expensesService.getSummary(month, {
       id: user.id,
@@ -107,7 +107,7 @@ export class ExpensesController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateExpenseDto: UpdateExpenseDto,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     const expense = await this.expensesService.update(id, updateExpenseDto, {
       id: user.id,
@@ -121,7 +121,7 @@ export class ExpensesController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     const expense = await this.expensesService.softDelete(id, {
       id: user.id,
@@ -136,7 +136,7 @@ export class ExpensesController {
   async createRefund(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() createRefundDto: CreateRefundDto,
-    @CurrentUser() user: { id: string; role: UserRole },
+    @CurrentUser() user: { id: string; role: UserRole }
   ) {
     // Enforce SUPER_ADMIN only — reject others with REFUND_FORBIDDEN_ROLE
     if (user.role !== UserRole.SUPER_ADMIN) {
@@ -146,15 +146,11 @@ export class ExpensesController {
           message: 'Only SUPER_ADMIN can create refunds',
           data: { code: 'REFUND_FORBIDDEN_ROLE' },
         },
-        HttpStatus.FORBIDDEN,
+        HttpStatus.FORBIDDEN
       );
     }
 
-    const refund = await this.expensesService.createRefund(
-      id,
-      createRefundDto,
-      user.id,
-    );
+    const refund = await this.expensesService.createRefund(id, createRefundDto, user.id);
     return ApiResponseDto.success('Refund created successfully', refund);
   }
 

@@ -18,7 +18,7 @@ export class AccountsService {
     @InjectRepository(AccountTransfer)
     private accountTransferRepository: Repository<AccountTransfer>,
     private readonly dataSource: DataSource,
-    private readonly accountBalanceService: AccountBalanceService,
+    private readonly accountBalanceService: AccountBalanceService
   ) {}
 
   async create(dto: CreateAccountDto, userId: string): Promise<Account> {
@@ -72,7 +72,7 @@ export class AccountsService {
           message: 'Account type cannot be changed after creation',
           data: { code: 'ACCOUNT_TYPE_IMMUTABLE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -105,10 +105,11 @@ export class AccountsService {
       throw new HttpException(
         {
           status: 'error',
-          message: 'Account is referenced by existing expenses or transfers and cannot be deleted. Consider archiving instead.',
+          message:
+            'Account is referenced by existing expenses or transfers and cannot be deleted. Consider archiving instead.',
           data: { code: 'ACCOUNT_IN_USE' },
         },
-        HttpStatus.CONFLICT,
+        HttpStatus.CONFLICT
       );
     }
 
@@ -152,6 +153,88 @@ export class AccountsService {
     return this.findOneOrFail(id);
   }
 
+  /**
+   * Add balance to an account (credit/deposit).
+   * For Asset accounts (BANK/CASH): increments currentBalance
+   * For Liability accounts (CREDIT_CARD/OVERDRAFT): decrements currentOutstanding (payment)
+   *
+   * Designed for future integration with inventory/sales module where
+   * sales revenue will automatically credit the selected account.
+   */
+  async addBalance(
+    id: string,
+    dto: { amount: number; description: string; sourceType?: string; sourceId?: string },
+    userId: string
+  ): Promise<Account> {
+    const account = await this.findOneOrFail(id);
+    const amount = Number(dto.amount);
+
+    if (amount <= 0) {
+      throw new HttpException(
+        {
+          status: 'error',
+          message: 'Amount must be greater than 0',
+          data: { code: 'INVALID_AMOUNT' },
+        },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    // Use transaction for atomic balance update
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      if (account.accountType === AccountType.BANK || account.accountType === AccountType.CASH) {
+        // Asset account: increment balance
+        await queryRunner.query(
+          `UPDATE account SET current_balance = current_balance + $1, updated_by = $2, updated_at = NOW() WHERE id = $3`,
+          [amount, userId, account.id]
+        );
+      } else if (
+        account.accountType === AccountType.CREDIT_CARD ||
+        account.accountType === AccountType.OVERDRAFT
+      ) {
+        // Liability account: decrement outstanding (payment toward liability)
+        const currentOutstanding = Number(account.currentOutstanding) || 0;
+        if (amount > currentOutstanding) {
+          throw new HttpException(
+            {
+              status: 'error',
+              message: 'Amount exceeds current outstanding',
+              data: { code: 'EXCEEDS_OUTSTANDING' },
+            },
+            HttpStatus.BAD_REQUEST
+          );
+        }
+        await queryRunner.query(
+          `UPDATE account SET current_outstanding = current_outstanding - $1, updated_by = $2, updated_at = NOW() WHERE id = $3`,
+          [amount, userId, account.id]
+        );
+      } else {
+        throw new HttpException(
+          {
+            status: 'error',
+            message: 'Cannot add balance to LOAN accounts',
+            data: { code: 'ACCOUNT_TYPE_NOT_CREDITABLE' },
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Return updated account
+      return this.findOneOrFail(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   // --- Private helpers ---
 
   private async findOneOrFail(id: string): Promise<Account> {
@@ -166,7 +249,7 @@ export class AccountsService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -184,7 +267,7 @@ export class AccountsService {
               message: 'openingBalance is required for BANK/CASH accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (typeof dto.openingBalance !== 'number' || isNaN(dto.openingBalance)) {
@@ -194,7 +277,7 @@ export class AccountsService {
               message: 'openingBalance must be a valid number',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.openingBalance < 0) {
@@ -204,7 +287,7 @@ export class AccountsService {
               message: 'openingBalance must be >= 0 for BANK/CASH accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         break;
@@ -217,7 +300,7 @@ export class AccountsService {
               message: 'creditLimit is required for CREDIT_CARD accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.creditLimit <= 0) {
@@ -227,7 +310,7 @@ export class AccountsService {
               message: 'creditLimit must be > 0 for CREDIT_CARD accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding === undefined || dto.currentOutstanding === null) {
@@ -237,7 +320,7 @@ export class AccountsService {
               message: 'currentOutstanding is required for CREDIT_CARD accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding < 0) {
@@ -247,7 +330,7 @@ export class AccountsService {
               message: 'currentOutstanding must be >= 0 for CREDIT_CARD accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding > dto.creditLimit) {
@@ -257,7 +340,7 @@ export class AccountsService {
               message: 'currentOutstanding cannot exceed creditLimit for CREDIT_CARD accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         break;
@@ -270,7 +353,7 @@ export class AccountsService {
               message: 'overdraftLimit is required for OVERDRAFT accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.overdraftLimit <= 0) {
@@ -280,7 +363,7 @@ export class AccountsService {
               message: 'overdraftLimit must be > 0 for OVERDRAFT accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding === undefined || dto.currentOutstanding === null) {
@@ -290,7 +373,7 @@ export class AccountsService {
               message: 'currentOutstanding is required for OVERDRAFT accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding < 0) {
@@ -300,7 +383,7 @@ export class AccountsService {
               message: 'currentOutstanding must be >= 0 for OVERDRAFT accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.currentOutstanding > dto.overdraftLimit) {
@@ -310,7 +393,7 @@ export class AccountsService {
               message: 'currentOutstanding cannot exceed overdraftLimit for OVERDRAFT accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         break;
@@ -323,7 +406,7 @@ export class AccountsService {
               message: 'principalOutstanding is required for LOAN accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         if (dto.principalOutstanding < 0) {
@@ -333,7 +416,7 @@ export class AccountsService {
               message: 'principalOutstanding must be >= 0 for LOAN accounts',
               data: { code: 'VALIDATION_ERROR' },
             },
-            HttpStatus.BAD_REQUEST,
+            HttpStatus.BAD_REQUEST
           );
         }
         break;
@@ -343,9 +426,10 @@ export class AccountsService {
   private async checkDuplicateName(
     name: string,
     accountType: AccountType,
-    excludeId?: string,
+    excludeId?: string
   ): Promise<void> {
-    const query = this.accountRepository.createQueryBuilder('account')
+    const query = this.accountRepository
+      .createQueryBuilder('account')
       .where('account.name = :name', { name })
       .andWhere('account.accountType = :accountType', { accountType })
       .andWhere('account.status = :status', { status: AccountStatus.ACTIVE })
@@ -364,7 +448,7 @@ export class AccountsService {
           message: `An active account with name "${name}" and type "${accountType}" already exists`,
           data: { code: 'ACCOUNT_NAME_DUPLICATE' },
         },
-        HttpStatus.CONFLICT,
+        HttpStatus.CONFLICT
       );
     }
   }
@@ -387,10 +471,9 @@ export class AccountsService {
     // Check for non-deleted account transfers referencing this account
     const transferCount = await this.accountTransferRepository
       .createQueryBuilder('transfer')
-      .where(
-        '(transfer.fromAccountId = :accountId OR transfer.toAccountId = :accountId)',
-        { accountId },
-      )
+      .where('(transfer.fromAccountId = :accountId OR transfer.toAccountId = :accountId)', {
+        accountId,
+      })
       .andWhere('transfer.deletedAt IS NULL')
       .getCount();
 
@@ -408,7 +491,7 @@ export class AccountsService {
           message: 'Cannot transfer to the same account',
           data: { code: 'TRANSFER_SAME_ACCOUNT' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -427,7 +510,7 @@ export class AccountsService {
           message: 'Source account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -438,19 +521,22 @@ export class AccountsService {
           message: 'Destination account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
     // Reject LOAN accounts
-    if (fromAccount.accountType === AccountType.LOAN || toAccount.accountType === AccountType.LOAN) {
+    if (
+      fromAccount.accountType === AccountType.LOAN ||
+      toAccount.accountType === AccountType.LOAN
+    ) {
       throw new HttpException(
         {
           status: 'error',
           message: 'Transfers involving LOAN accounts are not allowed',
           data: { code: 'ACCOUNT_TYPE_NOT_TRANSFERABLE' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 
@@ -512,7 +598,7 @@ export class AccountsService {
           message: 'Transfer not found',
           data: { code: 'TRANSFER_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { PayrollRun, PayrollStatus } from './entities/payroll-run.entity';
@@ -43,7 +49,7 @@ export class PayrollService {
     private employeesService: EmployeesService,
     private attendanceService: AttendanceService,
     @Inject(forwardRef(() => PayrollIntegrationService))
-    private payrollIntegrationService: PayrollIntegrationService,
+    private payrollIntegrationService: PayrollIntegrationService
   ) {}
 
   async runPayroll(
@@ -114,13 +120,13 @@ export class PayrollService {
     for (const entry of entries) {
       const monthAdvanceTotal = await this.payrollIntegrationService.computeMonthAdvanceTotal(
         entry.employeeId,
-        monthStr,
+        monthStr
       );
 
       if (monthAdvanceTotal > 0) {
         const carryForwardIn = await this.payrollIntegrationService.getCarryForwardIn(
           entry.employeeId,
-          monthStr,
+          monthStr
         );
 
         const totalDeduction = monthAdvanceTotal + carryForwardIn;

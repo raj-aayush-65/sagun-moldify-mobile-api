@@ -16,7 +16,15 @@ import { EmployeeAdvancesController } from './employee-advances.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Expense, Refund, Account, AccountTransfer, Employee, PayrollRun, PayrollEntry]),
+    TypeOrmModule.forFeature([
+      Expense,
+      Refund,
+      Account,
+      AccountTransfer,
+      Employee,
+      PayrollRun,
+      PayrollEntry,
+    ]),
     ConfigModule,
   ],
   controllers: [ExpensesController, EmployeeAdvancesController],
