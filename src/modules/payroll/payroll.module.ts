@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PayrollRun } from './entities/payroll-run.entity';
 import { PayrollEntry } from './entities/payroll-entry.entity';
@@ -8,6 +8,7 @@ import { PayrollController } from './payroll.controller';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EmployeesModule } from '../employees/employees.module';
 import { AttendanceModule } from '../attendance/attendance.module';
+import { ExpensesModule } from '../expenses/expenses.module';
 import { User } from '../users/entities/user.entity';
 
 @Module({
@@ -15,6 +16,7 @@ import { User } from '../users/entities/user.entity';
     TypeOrmModule.forFeature([PayrollRun, PayrollEntry, User]),
     EmployeesModule,
     AttendanceModule,
+    forwardRef(() => ExpensesModule),
   ],
   controllers: [PayrollController],
   providers: [PayrollService, PdfService, RolesGuard],

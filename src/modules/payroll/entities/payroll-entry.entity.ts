@@ -146,6 +146,36 @@ export class PayrollEntry {
   netSalary: number;
 
   @Column({
+    name: 'advances_deducted',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numberTransformer,
+  })
+  advancesDeducted: number;
+
+  @Column({
+    name: 'carry_forward_in',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numberTransformer,
+  })
+  carryForwardIn: number;
+
+  @Column({
+    name: 'carry_forward_out',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numberTransformer,
+  })
+  carryForwardOut: number;
+
+  @Column({
     type: 'enum',
     enum: PayrollEntryStatus,
     default: PayrollEntryStatus.PENDING,

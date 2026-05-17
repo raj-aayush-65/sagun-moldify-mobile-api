@@ -15,6 +15,7 @@ import {
 import { Response } from 'express';
 import { PayrollService } from './payroll.service';
 import { PdfService } from './pdf.service';
+import { PayrollIntegrationService } from '../expenses/payroll-integration.service';
 import { PayrollEntryStatus } from './entities/payroll-entry.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -52,7 +53,8 @@ interface AuthRequest {
 export class PayrollController {
   constructor(
     private readonly payrollService: PayrollService,
-    private readonly pdfService: PdfService
+    private readonly pdfService: PdfService,
+    private readonly payrollIntegrationService: PayrollIntegrationService
   ) {}
 
   @Post('run')
@@ -265,6 +267,61 @@ export class PayrollController {
     return this.payrollService.getAllPayrollRuns();
   }
 
+  @Get('payslip-detail')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
+  async getPayslipDetail(
+    @Query('employeeId') employeeId: string,
+    @Query('month') month: string,
+    @Query('year') year: string
+  ) {
+    if (!employeeId || !month || !year) {
+      throw new NotFoundException('Missing required parameters: employeeId, month, year');
+    }
+
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+
+    if (isNaN(monthNum) || isNaN(yearNum) || monthNum < 1 || monthNum > 12) {
+      throw new NotFoundException('Invalid month or year parameters');
+    }
+
+    const entry = await this.payrollService.getPayrollEntryByEmployeeAndMonth(
+      employeeId,
+      yearNum,
+      monthNum
+    );
+
+    if (!entry) {
+      throw new NotFoundException(`No payroll entry found for this employee in ${year}-${month}`);
+    }
+
+    // Get advance details from PayrollIntegrationService
+    const monthStr = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+    const advancesResult = await this.payrollIntegrationService.getEmployeeAdvances(
+      employeeId,
+      monthStr
+    );
+
+    // Build advances array with required fields
+    const advances = advancesResult.items.map(item => ({
+      expenseId: item.id,
+      expenseDate: item.expenseDate,
+      amount: Number(item.amount),
+      description: item.description,
+    }));
+
+    const advancesSubtotal = advancesResult.totalAdvance;
+
+    return {
+      ...entry,
+      advances,
+      advancesSubtotal,
+      carryForwardIn: Number(entry.carryForwardIn),
+      carryForwardOut: Number(entry.carryForwardOut),
+      netSalary: Number(entry.netSalary),
+    };
+  }
+
   @Get(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER, UserRole.HIGHER_OPS)
   findPayrollRun(@Param('id', ParseUUIDPipe) id: string) {
@@ -320,13 +377,33 @@ export class PayrollController {
     }
 
     const entry = await this.payrollService.getPayrollEntry(entryId);
-    const pdfBuffer = await this.pdfService.generatePayslip(entry, parseInt(month), parseInt(year));
+
+    // Fetch advance data for the payslip
+    const monthStr = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+    const advancesResult = await this.payrollIntegrationService.getEmployeeAdvances(
+      entry.employeeId,
+      monthStr
+    );
+
+    const advanceData = {
+      advances: advancesResult.items.map(item => ({
+        expenseId: item.id,
+        expenseDate: item.expenseDate,
+        amount: Number(item.amount),
+        description: item.description,
+      })),
+      advancesSubtotal: advancesResult.totalAdvance,
+      carryForwardIn: advancesResult.carryForwardIn,
+      carryForwardOut: advancesResult.carryForwardOut,
+    };
+
+    const pdfBuffer = await this.pdfService.generatePayslip(entry, monthNum, yearNum, advanceData);
 
     const filename = this.pdfService.getFilename(
       entry.employee?.name || 'Employee',
       entry.employeeId,
-      parseInt(month),
-      parseInt(year)
+      monthNum,
+      yearNum
     );
 
     res.set({
@@ -368,13 +445,32 @@ export class PayrollController {
       throw new NotFoundException(`No payroll entry found for this employee in ${year}-${month}`);
     }
 
-    const pdfBuffer = await this.pdfService.generatePayslip(entry, parseInt(month), parseInt(year));
+    // Fetch advance data for the payslip
+    const monthStr = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+    const advancesResult = await this.payrollIntegrationService.getEmployeeAdvances(
+      employeeId,
+      monthStr
+    );
+
+    const advanceData = {
+      advances: advancesResult.items.map(item => ({
+        expenseId: item.id,
+        expenseDate: item.expenseDate,
+        amount: Number(item.amount),
+        description: item.description,
+      })),
+      advancesSubtotal: advancesResult.totalAdvance,
+      carryForwardIn: advancesResult.carryForwardIn,
+      carryForwardOut: advancesResult.carryForwardOut,
+    };
+
+    const pdfBuffer = await this.pdfService.generatePayslip(entry, monthNum, yearNum, advanceData);
 
     const filename = this.pdfService.getFilename(
       entry.employee?.name || 'Employee',
       entry.employeeId,
-      parseInt(month),
-      parseInt(year)
+      monthNum,
+      yearNum
     );
 
     res.set({
