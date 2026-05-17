@@ -18,15 +18,13 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 @Controller('employees')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmployeeAdvancesController {
-  constructor(
-    private readonly payrollIntegrationService: PayrollIntegrationService,
-  ) {}
+  constructor(private readonly payrollIntegrationService: PayrollIntegrationService) {}
 
   @Get(':id/advances')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
   async getEmployeeAdvances(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('month') month?: string,
+    @Query('month') month?: string
   ) {
     // Default to current IST month if not provided
     const targetMonth = month || this.payrollIntegrationService.getCurrentISTMonth();
@@ -39,7 +37,7 @@ export class EmployeeAdvancesController {
           message: 'Month must be in YYYY-MM format',
           data: { code: 'INVALID_MONTH_FORMAT' },
         },
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST
       );
     }
 

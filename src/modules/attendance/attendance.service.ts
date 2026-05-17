@@ -443,9 +443,7 @@ export class AttendanceService {
     };
   }
 
-  async checkAttendanceForDate(
-    date: string
-  ): Promise<
+  async checkAttendanceForDate(date: string): Promise<
     Record<
       string,
       {

@@ -26,7 +26,7 @@ export class AccountTransfersController {
   @Roles(UserRole.SUPER_ADMIN)
   async createTransfer(
     @Body() createTransferDto: CreateTransferDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser('id') userId: string
   ) {
     const transfer = await this.accountsService.createTransfer(createTransferDto, userId);
     return ApiResponseDto.success('Transfer created successfully', transfer);
@@ -41,10 +41,7 @@ export class AccountTransfersController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
-  async deleteTransfer(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  async deleteTransfer(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('id') userId: string) {
     await this.accountsService.deleteTransfer(id, userId);
     return ApiResponseDto.success('Transfer deleted successfully');
   }

@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsEnum,
-  IsNumber,
-  MaxLength,
-} from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, MaxLength } from 'class-validator';
 import { AccountType } from '../enums/account-type.enum';
 
 export class UpdateAccountDto {

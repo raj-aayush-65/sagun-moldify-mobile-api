@@ -116,10 +116,10 @@ export class CreateAccountTable1734000000000 implements MigrationInterface {
 
     // Additional indexes for common queries
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_account_status" ON "account"("status");`,
+      `CREATE INDEX IF NOT EXISTS "idx_account_status" ON "account"("status");`
     );
     await queryRunner.query(
-      `CREATE INDEX IF NOT EXISTS "idx_account_type" ON "account"("account_type");`,
+      `CREATE INDEX IF NOT EXISTS "idx_account_type" ON "account"("account_type");`
     );
   }
 
@@ -127,9 +127,7 @@ export class CreateAccountTable1734000000000 implements MigrationInterface {
     // Drop indexes
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_account_type";`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_account_status";`);
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "idx_account_name_type_active";`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "idx_account_name_type_active";`);
 
     // Drop table
     await queryRunner.query(`DROP TABLE IF EXISTS "account";`);

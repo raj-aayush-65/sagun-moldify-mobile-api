@@ -171,9 +171,10 @@ export class PdfService {
         // Add individual Employee Advance line items
         if (advanceData && advanceData.advances.length > 0) {
           advanceData.advances.forEach(advance => {
-            const dateStr = typeof advance.expenseDate === 'string'
-              ? advance.expenseDate.substring(0, 10)
-              : new Date(advance.expenseDate).toISOString().split('T')[0];
+            const dateStr =
+              typeof advance.expenseDate === 'string'
+                ? advance.expenseDate.substring(0, 10)
+                : new Date(advance.expenseDate).toISOString().split('T')[0];
             deductions.push({
               description: `Advance (${dateStr}): ${advance.description}`,
               rate: '-',

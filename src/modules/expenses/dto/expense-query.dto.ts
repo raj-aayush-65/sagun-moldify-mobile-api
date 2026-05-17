@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsEnum,
-  IsNumberString,
-} from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumberString } from 'class-validator';
 import { ExpenseType } from '../enums/expense-type.enum';
 import { ExpenseCategory } from '../enums/expense-category.enum';
 

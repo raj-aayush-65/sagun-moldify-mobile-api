@@ -27,10 +27,7 @@ export class AccountsController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
-  async create(
-    @Body() createAccountDto: CreateAccountDto,
-    @CurrentUser('id') userId: string,
-  ) {
+  async create(@Body() createAccountDto: CreateAccountDto, @CurrentUser('id') userId: string) {
     const account = await this.accountsService.create(createAccountDto, userId);
     return ApiResponseDto.success('Account created successfully', account);
   }
@@ -56,7 +53,7 @@ export class AccountsController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateAccountDto: UpdateAccountDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser('id') userId: string
   ) {
     const account = await this.accountsService.update(id, updateAccountDto, userId);
     return ApiResponseDto.success('Account updated successfully', account);
@@ -67,7 +64,7 @@ export class AccountsController {
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('archive') archive: string,
-    @CurrentUser('id') userId: string,
+    @CurrentUser('id') userId: string
   ) {
     if (archive === 'true') {
       const account = await this.accountsService.archive(id, userId);
@@ -84,5 +81,18 @@ export class AccountsController {
   async recomputeBalance(@Param('id', ParseUUIDPipe) id: string) {
     const result = await this.accountsService.recomputeBalance(id);
     return ApiResponseDto.success('Balance recomputed successfully', result);
+  }
+
+  // --- Add balance (credit/deposit) endpoint ---
+
+  @Post(':id/add-balance')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SUPER_USER)
+  async addBalance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { amount: number; description: string; sourceType?: string; sourceId?: string },
+    @CurrentUser('id') userId: string
+  ) {
+    const account = await this.accountsService.addBalance(id, body, userId);
+    return ApiResponseDto.success('Balance added successfully', account);
   }
 }

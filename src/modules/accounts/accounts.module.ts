@@ -8,10 +8,7 @@ import { AccountTransfersController } from './account-transfers.controller';
 import { ExpensesModule } from '../expenses/expenses.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Account, AccountTransfer]),
-    ExpensesModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Account, AccountTransfer]), ExpensesModule],
   controllers: [AccountsController, AccountTransfersController],
   providers: [AccountsService],
   exports: [AccountsService],

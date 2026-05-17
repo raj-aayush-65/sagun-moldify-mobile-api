@@ -22,7 +22,7 @@ export class PayrollIntegrationService {
     @InjectRepository(PayrollRun)
     private readonly payrollRunRepository: Repository<PayrollRun>,
     @InjectRepository(PayrollEntry)
-    private readonly payrollEntryRepository: Repository<PayrollEntry>,
+    private readonly payrollEntryRepository: Repository<PayrollEntry>
   ) {}
 
   /**
@@ -108,7 +108,7 @@ export class PayrollIntegrationService {
     const totalDeduction = monthAdvanceTotal + carryForwardIn;
 
     // Find or create the PayrollEntry for this employee in this PayrollRun
-    let entry = await this.payrollEntryRepository.findOne({
+    const entry = await this.payrollEntryRepository.findOne({
       where: {
         payrollRunId: payrollRun.id,
         employeeId,
@@ -164,16 +164,13 @@ export class PayrollIntegrationService {
     });
 
     // Filter by month (since Between doesn't work well with date type in all cases)
-    const filteredItems = items.filter((item) => {
+    const filteredItems = items.filter(item => {
       const dateStr = this.dateToString(item.expenseDate);
       return dateStr >= monthStart && dateStr <= monthEnd;
     });
 
     // totalAdvance: sum of amounts
-    const totalAdvance = filteredItems.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0,
-    );
+    const totalAdvance = filteredItems.reduce((sum, item) => sum + Number(item.amount), 0);
 
     // carryForwardIn: from prior month's PayrollEntry
     const carryForwardIn = await this.getCarryForwardIn(employeeId, month);

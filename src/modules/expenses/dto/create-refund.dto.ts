@@ -1,11 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsNumber,
-  IsDateString,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsDateString, MaxLength, Min } from 'class-validator';
 
 export class CreateRefundDto {
   @IsNumber()

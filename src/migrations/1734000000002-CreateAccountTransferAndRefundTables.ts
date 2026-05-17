@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateAccountTransferAndRefundTables1734000000002
-  implements MigrationInterface
-{
+export class CreateAccountTransferAndRefundTables1734000000002 implements MigrationInterface {
   name = 'CreateAccountTransferAndRefundTables1734000000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

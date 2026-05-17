@@ -21,7 +21,7 @@ export class AccountBalanceService {
     @InjectRepository(Refund)
     private readonly refundRepository: Repository<Refund>,
     @InjectRepository(AccountTransfer)
-    private readonly accountTransferRepository: Repository<AccountTransfer>,
+    private readonly accountTransferRepository: Repository<AccountTransfer>
   ) {}
 
   private isAssetAccount(accountType: AccountType): boolean {
@@ -29,10 +29,7 @@ export class AccountBalanceService {
   }
 
   private isLiabilityAccount(accountType: AccountType): boolean {
-    return (
-      accountType === AccountType.CREDIT_CARD ||
-      accountType === AccountType.OVERDRAFT
-    );
+    return accountType === AccountType.CREDIT_CARD || accountType === AccountType.OVERDRAFT;
   }
 
   private getAccountLimit(account: Account): number {
@@ -54,7 +51,7 @@ export class AccountBalanceService {
    */
   async applyExpenseImpact(
     expense: Expense,
-    queryRunner: QueryRunner,
+    queryRunner: QueryRunner
   ): Promise<BalanceOperationResult> {
     const result: BalanceOperationResult = {};
 
@@ -69,7 +66,7 @@ export class AccountBalanceService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -78,7 +75,7 @@ export class AccountBalanceService {
     if (this.isAssetAccount(account.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance - $1 WHERE id = $2`,
-        [amount, account.id],
+        [amount, account.id]
       );
 
       // Check if balance went negative for warning
@@ -104,13 +101,13 @@ export class AccountBalanceService {
               details: { availableHeadroom },
             },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
 
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding + $1 WHERE id = $2`,
-        [amount, account.id],
+        [amount, account.id]
       );
     }
 
@@ -122,10 +119,7 @@ export class AccountBalanceService {
    * - Asset_Account: increment currentBalance by expense.amount
    * - Liability_Account: decrement currentOutstanding by expense.amount
    */
-  async reverseExpenseImpact(
-    expense: Expense,
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  async reverseExpenseImpact(expense: Expense, queryRunner: QueryRunner): Promise<void> {
     const account = await queryRunner.manager.findOne(Account, {
       where: { id: expense.accountId },
     });
@@ -137,7 +131,7 @@ export class AccountBalanceService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -146,12 +140,12 @@ export class AccountBalanceService {
     if (this.isAssetAccount(account.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance + $1 WHERE id = $2`,
-        [amount, account.id],
+        [amount, account.id]
       );
     } else if (this.isLiabilityAccount(account.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding - $1 WHERE id = $2`,
-        [amount, account.id],
+        [amount, account.id]
       );
     }
   }
@@ -161,7 +155,7 @@ export class AccountBalanceService {
    */
   async handleExpenseCreate(
     expense: Expense,
-    queryRunner: QueryRunner,
+    queryRunner: QueryRunner
   ): Promise<BalanceOperationResult> {
     if (!expense.accountId) {
       return {};
@@ -175,7 +169,7 @@ export class AccountBalanceService {
   async handleExpenseUpdate(
     oldExpense: Expense,
     newExpense: Expense,
-    queryRunner: QueryRunner,
+    queryRunner: QueryRunner
   ): Promise<BalanceOperationResult> {
     if (oldExpense.accountId) {
       await this.reverseExpenseImpact(oldExpense, queryRunner);
@@ -191,10 +185,7 @@ export class AccountBalanceService {
   /**
    * Handle expense deletion: reverse balance impact if accountId is not null.
    */
-  async handleExpenseDelete(
-    expense: Expense,
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  async handleExpenseDelete(expense: Expense, queryRunner: QueryRunner): Promise<void> {
     if (!expense.accountId) {
       return;
     }
@@ -207,9 +198,7 @@ export class AccountBalanceService {
    * (subtract for asset, add for liability) + transfers (in/out) + refunds.
    * Persists the recomputed value and returns { prior, recomputed }.
    */
-  async recomputeBalance(
-    accountId: string,
-  ): Promise<{ prior: number; recomputed: number }> {
+  async recomputeBalance(accountId: string): Promise<{ prior: number; recomputed: number }> {
     const account = await this.accountRepository.findOne({
       where: { id: accountId, deletedAt: IsNull() },
     });
@@ -221,7 +210,7 @@ export class AccountBalanceService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -243,7 +232,7 @@ export class AccountBalanceService {
    * Formula: openingBalance - expenses + transfers_in - transfers_out + refunds
    */
   private async recomputeAssetBalance(
-    account: Account,
+    account: Account
   ): Promise<{ prior: number; recomputed: number }> {
     const prior = Number(account.currentBalance) || 0;
     const openingBalance = Number(account.openingBalance) || 0;
@@ -287,8 +276,7 @@ export class AccountBalanceService {
       .getRawOne();
     const refundTotal = parseFloat(refundSumResult?.total || '0');
 
-    const recomputed =
-      openingBalance - expenseTotal + transfersIn - transfersOut + refundTotal;
+    const recomputed = openingBalance - expenseTotal + transfersIn - transfersOut + refundTotal;
 
     await this.accountRepository.update(account.id, {
       currentBalance: recomputed,
@@ -307,7 +295,7 @@ export class AccountBalanceService {
    * Uses 0 as the opening base since the initial currentOutstanding was set at creation.
    */
   private async recomputeLiabilityBalance(
-    account: Account,
+    account: Account
   ): Promise<{ prior: number; recomputed: number }> {
     const prior = Number(account.currentOutstanding) || 0;
     const openingOutstanding = 0;
@@ -350,8 +338,7 @@ export class AccountBalanceService {
       .getRawOne();
     const refundTotal = parseFloat(refundSumResult?.total || '0');
 
-    const recomputed =
-      openingOutstanding + expenseTotal + transfersIn - transfersOut - refundTotal;
+    const recomputed = openingOutstanding + expenseTotal + transfersIn - transfersOut - refundTotal;
 
     await this.accountRepository.update(account.id, {
       currentOutstanding: recomputed,
@@ -369,7 +356,7 @@ export class AccountBalanceService {
    */
   async applyTransferImpact(
     transfer: AccountTransfer,
-    queryRunner: QueryRunner,
+    queryRunner: QueryRunner
   ): Promise<BalanceOperationResult> {
     const result: BalanceOperationResult = {};
 
@@ -388,7 +375,7 @@ export class AccountBalanceService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -398,7 +385,7 @@ export class AccountBalanceService {
     if (this.isAssetAccount(sourceAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance - $1 WHERE id = $2`,
-        [amount, sourceAccount.id],
+        [amount, sourceAccount.id]
       );
 
       const updatedSource = await queryRunner.manager.findOne(Account, {
@@ -420,13 +407,13 @@ export class AccountBalanceService {
               details: { currentOutstanding },
             },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
 
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding - $1 WHERE id = $2`,
-        [amount, sourceAccount.id],
+        [amount, sourceAccount.id]
       );
     }
 
@@ -434,7 +421,7 @@ export class AccountBalanceService {
     if (this.isAssetAccount(destAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance + $1 WHERE id = $2`,
-        [amount, destAccount.id],
+        [amount, destAccount.id]
       );
     } else if (this.isLiabilityAccount(destAccount.accountType)) {
       const currentOutstanding = Number(destAccount.currentOutstanding) || 0;
@@ -452,13 +439,13 @@ export class AccountBalanceService {
               details: { availableHeadroom },
             },
           },
-          HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST
         );
       }
 
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding + $1 WHERE id = $2`,
-        [amount, destAccount.id],
+        [amount, destAccount.id]
       );
     }
 
@@ -468,10 +455,7 @@ export class AccountBalanceService {
   /**
    * Reverse both sides of a transfer (for soft-delete).
    */
-  async reverseTransferImpact(
-    transfer: AccountTransfer,
-    queryRunner: QueryRunner,
-  ): Promise<void> {
+  async reverseTransferImpact(transfer: AccountTransfer, queryRunner: QueryRunner): Promise<void> {
     const sourceAccount = await queryRunner.manager.findOne(Account, {
       where: { id: transfer.fromAccountId },
     });
@@ -487,7 +471,7 @@ export class AccountBalanceService {
           message: 'Account not found',
           data: { code: 'ACCOUNT_NOT_FOUND' },
         },
-        HttpStatus.NOT_FOUND,
+        HttpStatus.NOT_FOUND
       );
     }
 
@@ -497,12 +481,12 @@ export class AccountBalanceService {
     if (this.isAssetAccount(sourceAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance + $1 WHERE id = $2`,
-        [amount, sourceAccount.id],
+        [amount, sourceAccount.id]
       );
     } else if (this.isLiabilityAccount(sourceAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding + $1 WHERE id = $2`,
-        [amount, sourceAccount.id],
+        [amount, sourceAccount.id]
       );
     }
 
@@ -510,12 +494,12 @@ export class AccountBalanceService {
     if (this.isAssetAccount(destAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_balance = current_balance - $1 WHERE id = $2`,
-        [amount, destAccount.id],
+        [amount, destAccount.id]
       );
     } else if (this.isLiabilityAccount(destAccount.accountType)) {
       await queryRunner.query(
         `UPDATE account SET current_outstanding = current_outstanding - $1 WHERE id = $2`,
-        [amount, destAccount.id],
+        [amount, destAccount.id]
       );
     }
   }
