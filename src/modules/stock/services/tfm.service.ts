@@ -77,12 +77,12 @@ export class TfmService {
         await manager.save(TfmRollConsumption, consumption);
 
         // Update roll status based on shiftEndStatus
-        if (rc.shiftEndStatus === RollStatus.CONSUMED) {
+        if (rc.shiftEndStatus === 'FULLY_USED') {
           roll.status = RollStatus.CONSUMED;
-        } else if (rc.shiftEndStatus === RollStatus.IN_USE) {
+        } else if (rc.shiftEndStatus === 'PARTIALLY_USED') {
           roll.status = RollStatus.IN_USE;
         }
-        // AVAILABLE (REMAINING) → keep AVAILABLE, no change needed
+        // REMAINING → keep AVAILABLE, no change needed
         await manager.save(Roll, roll);
       }
 
@@ -293,9 +293,9 @@ export class TfmService {
           await manager.save(TfmRollConsumption, consumption);
 
           // Update roll status
-          if (rc.shiftEndStatus === RollStatus.CONSUMED) {
+          if (rc.shiftEndStatus === 'FULLY_USED') {
             roll.status = RollStatus.CONSUMED;
-          } else if (rc.shiftEndStatus === RollStatus.IN_USE) {
+          } else if (rc.shiftEndStatus === 'PARTIALLY_USED') {
             roll.status = RollStatus.IN_USE;
           }
           await manager.save(Roll, roll);

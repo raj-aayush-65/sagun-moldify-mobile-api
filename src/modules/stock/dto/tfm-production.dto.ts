@@ -10,12 +10,15 @@ import {
   MaxLength,
   IsInt,
   IsDateString,
+  IsIn,
   ValidateNested,
   ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Shift } from '../enums/shift.enum';
-import { RollStatus } from '../enums/roll-status.enum';
+
+// Shift end status values sent from mobile (mapped to RollStatus in service)
+const SHIFT_END_STATUS_VALUES = ['FULLY_USED', 'PARTIALLY_USED', 'REMAINING'] as const;
 
 export class RollConsumptionEntryDto {
   @IsUUID()
@@ -31,8 +34,8 @@ export class RollConsumptionEntryDto {
   @Max(9999.999)
   wastage: number;
 
-  @IsEnum(RollStatus)
-  shiftEndStatus: RollStatus;
+  @IsIn(SHIFT_END_STATUS_VALUES)
+  shiftEndStatus: string;
 
   @IsOptional()
   @IsNumber()
