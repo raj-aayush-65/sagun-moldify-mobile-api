@@ -63,13 +63,19 @@ export class TfmService {
         // Check weight mismatch
         const weightMismatch = Math.abs(rc.rollWeight - Number(roll.netWeight)) > 0.5;
 
+        // Map shiftEndStatus from DTO values to DB enum values
+        const dbShiftEndStatus =
+          rc.shiftEndStatus === 'FULLY_USED' ? RollStatus.CONSUMED :
+          rc.shiftEndStatus === 'PARTIALLY_USED' ? RollStatus.IN_USE :
+          RollStatus.AVAILABLE;
+
         // Create roll consumption entry
         const consumption = manager.create(TfmRollConsumption, {
           tfmProductionRecordId: savedRecord.id,
           rollId: rc.rollId,
           rollWeight: rc.rollWeight,
           wastage: rc.wastage,
-          shiftEndStatus: rc.shiftEndStatus,
+          shiftEndStatus: dbShiftEndStatus,
           remainingWeight: rc.remainingWeight || undefined,
           weightMismatch,
           remarks: rc.remarks || undefined,
@@ -280,12 +286,18 @@ export class TfmService {
 
           const weightMismatch = Math.abs(rc.rollWeight - Number(roll.netWeight)) > 0.5;
 
+          // Map shiftEndStatus from DTO values to DB enum values
+          const dbShiftEndStatus =
+            rc.shiftEndStatus === 'FULLY_USED' ? RollStatus.CONSUMED :
+            rc.shiftEndStatus === 'PARTIALLY_USED' ? RollStatus.IN_USE :
+            RollStatus.AVAILABLE;
+
           const consumption = manager.create(TfmRollConsumption, {
             tfmProductionRecordId: id,
             rollId: rc.rollId,
             rollWeight: rc.rollWeight,
             wastage: rc.wastage,
-            shiftEndStatus: rc.shiftEndStatus,
+            shiftEndStatus: dbShiftEndStatus,
             remainingWeight: rc.remainingWeight || undefined,
             weightMismatch,
             remarks: rc.remarks || undefined,
