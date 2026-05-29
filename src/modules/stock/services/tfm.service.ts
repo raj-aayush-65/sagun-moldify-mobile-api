@@ -65,9 +65,11 @@ export class TfmService {
 
         // Map shiftEndStatus from DTO values to DB enum values
         const dbShiftEndStatus =
-          rc.shiftEndStatus === 'FULLY_USED' ? RollStatus.CONSUMED :
-          rc.shiftEndStatus === 'PARTIALLY_USED' ? RollStatus.IN_USE :
-          RollStatus.AVAILABLE;
+          rc.shiftEndStatus === 'FULLY_USED'
+            ? RollStatus.CONSUMED
+            : rc.shiftEndStatus === 'PARTIALLY_USED'
+              ? RollStatus.IN_USE
+              : RollStatus.AVAILABLE;
 
         // Create roll consumption entry
         const consumption = manager.create(TfmRollConsumption, {
@@ -288,9 +290,11 @@ export class TfmService {
 
           // Map shiftEndStatus from DTO values to DB enum values
           const dbShiftEndStatus =
-            rc.shiftEndStatus === 'FULLY_USED' ? RollStatus.CONSUMED :
-            rc.shiftEndStatus === 'PARTIALLY_USED' ? RollStatus.IN_USE :
-            RollStatus.AVAILABLE;
+            rc.shiftEndStatus === 'FULLY_USED'
+              ? RollStatus.CONSUMED
+              : rc.shiftEndStatus === 'PARTIALLY_USED'
+                ? RollStatus.IN_USE
+                : RollStatus.AVAILABLE;
 
           const consumption = manager.create(TfmRollConsumption, {
             tfmProductionRecordId: id,

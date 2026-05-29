@@ -151,8 +151,11 @@ export class SheetLineService {
       const actualProduction = rolls.reduce((acc, r) => acc + Number(r.netWeight), 0);
       const wastageTotal = wastages.reduce((acc, w) => acc + Number(w.weight), 0);
       const difference = actualMaterialUsed - actualProduction - wastageTotal;
+      // Only show reconciliation warning when rolls ARE produced (if no rolls, it's just material logging)
       const reconciliationWarning =
-        actualMaterialUsed > 0 ? Math.abs(difference) > 0.02 * actualMaterialUsed : false;
+        actualMaterialUsed > 0 && actualProduction > 0
+          ? Math.abs(difference) > 0.02 * actualMaterialUsed
+          : false;
 
       // Update reconciliation warning on report
       savedReport.reconciliationWarning = reconciliationWarning;
@@ -219,7 +222,10 @@ export class SheetLineService {
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 20;
 
-    const query = this.reportRepo.createQueryBuilder('r');
+    const query = this.reportRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.materialUsages', 'mu')
+      .leftJoinAndSelect('r.wastages', 'w');
 
     if (filters.dateFrom) {
       query.andWhere('r.date >= :dateFrom', { dateFrom: filters.dateFrom });
@@ -423,8 +429,11 @@ export class SheetLineService {
       const actualProduction = rolls.reduce((acc, r) => acc + Number(r.netWeight), 0);
       const wastageTotal = wastages.reduce((acc, w) => acc + Number(w.weight), 0);
       const difference = actualMaterialUsed - actualProduction - wastageTotal;
+      // Only show reconciliation warning when rolls ARE produced
       const reconciliationWarning =
-        actualMaterialUsed > 0 ? Math.abs(difference) > 0.02 * actualMaterialUsed : false;
+        actualMaterialUsed > 0 && actualProduction > 0
+          ? Math.abs(difference) > 0.02 * actualMaterialUsed
+          : false;
 
       report.reconciliationWarning = reconciliationWarning;
       const savedReport = await manager.save(SheetLineReport, report);

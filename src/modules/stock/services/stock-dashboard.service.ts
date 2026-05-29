@@ -31,11 +31,14 @@ export class StockDashboardService {
       closingStock: level.closingStock,
     }));
 
-    // Sheet line output: SUM(roll.net_weight) WHERE roll.date = date
-    const sheetLineResult = await this.rollRepo
-      .createQueryBuilder('roll')
-      .select('COALESCE(SUM(roll.net_weight), 0)', 'total')
-      .where('roll.date = :date', { date: targetDate })
+    // Sheet line output: SUM of material used on that date (from sheet_line_material_usage joined with sheet_line_report)
+    // This shows total material processed through the sheet line, regardless of whether rolls were logged
+    const sheetLineResult = await this.rollRepo.manager
+      .createQueryBuilder()
+      .select('COALESCE(SUM(mu.quantity_used), 0)', 'total')
+      .from('sheet_line_material_usage', 'mu')
+      .innerJoin('sheet_line_report', 'r', 'r.id = mu.sheet_line_report_id')
+      .where('r.date = :date', { date: targetDate })
       .getRawOne();
     const sheetLineOutput = parseFloat(sheetLineResult.total);
 
