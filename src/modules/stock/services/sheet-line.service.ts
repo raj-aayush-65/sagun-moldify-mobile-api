@@ -268,10 +268,12 @@ export class SheetLineService {
         throw new NotFoundException('SHEET_LINE_REPORT_NOT_FOUND');
       }
 
-      // If date or shift changed, validate uniqueness
+      // If date or shift changed from original, validate uniqueness
       const newDate = dto.date || report.date;
       const newShift = dto.shift || report.shift;
-      if (dto.date || dto.shift) {
+      const dateChanged = dto.date && dto.date !== report.date;
+      const shiftChanged = dto.shift && dto.shift !== report.shift;
+      if (dateChanged || shiftChanged) {
         const duplicate = await manager.findOne(SheetLineReport, {
           where: { date: newDate, shift: newShift },
         });
