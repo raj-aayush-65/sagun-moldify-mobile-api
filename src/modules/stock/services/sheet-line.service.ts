@@ -39,14 +39,6 @@ export class SheetLineService {
 
   async createReport(dto: CreateSheetLineReportDto, userId: string): Promise<any> {
     return this.dataSource.transaction(async manager => {
-      // Validate (date, shift) uniqueness
-      const existing = await manager.findOne(SheetLineReport, {
-        where: { date: dto.date, shift: dto.shift },
-      });
-      if (existing) {
-        throw new ConflictException('SHEET_LINE_REPORT_DUPLICATE');
-      }
-
       // Persist report
       const report = manager.create(SheetLineReport, {
         date: dto.date,
@@ -268,20 +260,6 @@ export class SheetLineService {
         throw new NotFoundException('SHEET_LINE_REPORT_NOT_FOUND');
       }
 
-      // If date or shift changed from original, validate uniqueness
-      const newDate = dto.date || report.date;
-      const newShift = dto.shift || report.shift;
-      const dateChanged = dto.date && dto.date !== report.date;
-      const shiftChanged = dto.shift && dto.shift !== report.shift;
-      if (dateChanged || shiftChanged) {
-        const duplicate = await manager.findOne(SheetLineReport, {
-          where: { date: newDate, shift: newShift },
-        });
-        if (duplicate && duplicate.id !== id) {
-          throw new ConflictException('SHEET_LINE_REPORT_DUPLICATE');
-        }
-      }
-
       // Update report fields
       if (dto.date !== undefined) report.date = dto.date;
       if (dto.shift !== undefined) report.shift = dto.shift;
@@ -400,7 +378,7 @@ export class SheetLineService {
 
             const roll = manager.create(Roll, {
               rollNo: entry.rollNo,
-              date: newDate,
+              date: report.date,
               sheetLineReportId: id,
               thickness: entry.thickness,
               width: entry.width,

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { TfmProductionRecord } from '../entities/tfm-production-record.entity';
@@ -34,14 +29,6 @@ export class TfmService {
 
   async createRecord(dto: CreateTfmProductionDto, userId: string): Promise<TfmProductionRecord> {
     return this.dataSource.transaction<TfmProductionRecord>(async manager => {
-      // Validate (date, shift) uniqueness
-      const existing = await manager.findOne(TfmProductionRecord, {
-        where: { date: dto.date, shift: dto.shift },
-      });
-      if (existing) {
-        throw new ConflictException('TFM_RECORD_DUPLICATE');
-      }
-
       // Create the production record
       const record = manager.create(TfmProductionRecord, {
         date: dto.date,
@@ -235,21 +222,6 @@ export class TfmService {
 
       if (!record) {
         throw new NotFoundException('TFM_RECORD_NOT_FOUND');
-      }
-
-      // Check uniqueness if date or shift is changing
-      if (dto.date || dto.shift) {
-        const newDate = dto.date || record.date;
-        const newShift = dto.shift || record.shift;
-
-        if (newDate !== record.date || newShift !== record.shift) {
-          const duplicate = await manager.findOne(TfmProductionRecord, {
-            where: { date: newDate, shift: newShift },
-          });
-          if (duplicate && duplicate.id !== id) {
-            throw new ConflictException('TFM_RECORD_DUPLICATE');
-          }
-        }
       }
 
       // Reverse prior roll status changes (set rolls back to AVAILABLE)
