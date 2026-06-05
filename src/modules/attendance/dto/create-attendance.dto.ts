@@ -169,7 +169,7 @@ export class BulkRangeAttendanceDto {
 
   @IsEnum(AttendanceStatus)
   @IsOptional()
-  mondayStatus?: AttendanceStatus;
+  sundayStatus?: AttendanceStatus;
 
   @IsEnum(AttendanceStatus)
   @IsOptional()

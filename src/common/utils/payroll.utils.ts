@@ -27,17 +27,17 @@ export function calculatePickerEarnings(
 }
 
 /**
- * Calculate the number of Mondays in a given month
+ * Calculate the number of Sundays in a given month
  */
-export function getMondaysInMonth(year: number, month: number): number {
+export function getSundaysInMonth(year: number, month: number): number {
   const daysInMonth = new Date(year, month, 0).getDate();
-  let mondays = 0;
+  let sundays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
-    if (new Date(year, month - 1, d).getDay() === 1) {
-      mondays++;
+    if (new Date(year, month - 1, d).getDay() === 0) {
+      sundays++;
     }
   }
-  return mondays;
+  return sundays;
 }
 
 /**

@@ -50,7 +50,7 @@ export class AttendanceService {
       );
     }
 
-    // Check if it's a Monday - if so, set status to WORKED_MONDAY if marked as present
+    // Check if it's a Sunday - if so, set status to WORKED_SUNDAY if marked as present
     const date = new Date(createAttendanceDto.attendanceDate);
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday
 
@@ -94,8 +94,8 @@ export class AttendanceService {
 
     const attendance = this.attendanceRepository.create(attendanceData);
 
-    // Auto-set Monday as holiday worked
-    if (dayOfWeek === 1 && createAttendanceDto.status === AttendanceStatus.PRESENT) {
+    // Auto-set Sunday as holiday worked
+    if (dayOfWeek === 0 && createAttendanceDto.status === AttendanceStatus.PRESENT) {
       attendance.status = AttendanceStatus.WORKING;
       attendance.isHolidayWorked = true;
     }
@@ -153,8 +153,8 @@ export class AttendanceService {
         let status = AttendanceStatus.PRESENT;
         let isHolidayWorked = false;
 
-        // Auto-set Monday as WORKING
-        if (dayOfWeek === 1) {
+        // Auto-set Sunday as WORKING
+        if (dayOfWeek === 0) {
           status = AttendanceStatus.WORKING;
           isHolidayWorked = true;
         }
@@ -271,9 +271,9 @@ export class AttendanceService {
           let status: AttendanceStatus;
           let isHolidayWorked = false;
 
-          if (dayOfWeek === 1) {
-            // Monday - use mondayStatus from DTO
-            status = bulkRangeDto.mondayStatus || AttendanceStatus.HOLIDAY;
+          if (dayOfWeek === 0) {
+            // Sunday - use sundayStatus from DTO
+            status = bulkRangeDto.sundayStatus || AttendanceStatus.HOLIDAY;
             if (status === AttendanceStatus.PRESENT || status === AttendanceStatus.WORKING) {
               isHolidayWorked = true;
             }
@@ -363,10 +363,10 @@ export class AttendanceService {
   async update(id: string, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
     const attendance = await this.findOne(id);
 
-    // If status changed to PRESENT on a Monday, auto-set to WORKING
+    // If status changed to PRESENT on a Sunday, auto-set to WORKING
     if (updateAttendanceDto.status === AttendanceStatus.PRESENT && attendance.attendanceDate) {
       const dayOfWeek = new Date(attendance.attendanceDate).getDay();
-      if (dayOfWeek === 1) {
+      if (dayOfWeek === 0) {
         updateAttendanceDto.status = AttendanceStatus.WORKING;
         updateAttendanceDto.isHolidayWorked = true;
       }
@@ -510,13 +510,13 @@ export class AttendanceService {
       return existingAttendance;
     }
 
-    // Check if it's a Monday - auto mark as PRESENT with isHolidayWorked flag
+    // Check if it's a Sunday - auto mark as PRESENT with isHolidayWorked flag
     const dayOfWeek = date.getDay();
     let status = AttendanceStatus.PRESENT;
     let isHolidayWorked = false;
 
-    if (dayOfWeek === 1) {
-      // Monday is a holiday - mark as PRESENT with isHolidayWorked flag
+    if (dayOfWeek === 0) {
+      // Sunday is a holiday - mark as PRESENT with isHolidayWorked flag
       status = AttendanceStatus.PRESENT;
       isHolidayWorked = true;
     }

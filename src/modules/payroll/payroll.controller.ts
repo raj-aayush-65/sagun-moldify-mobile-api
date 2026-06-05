@@ -28,13 +28,13 @@ import { calculatePickerEarnings } from '../../common/utils/payroll.utils';
 // Helper functions for preview
 const SALARY_DAYS = 30;
 
-function getMondaysInMonth(year: number, month: number): number {
+function getSundaysInMonth(year: number, month: number): number {
   const daysInMonth = new Date(year, month, 0).getDate();
-  let mondays = 0;
+  let sundays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
-    if (new Date(year, month - 1, d).getDay() === 1) mondays++;
+    if (new Date(year, month - 1, d).getDay() === 0) sundays++;
   }
-  return mondays;
+  return sundays;
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -106,8 +106,8 @@ export class PayrollController {
     );
 
     const totalDaysInMonth = getDaysInMonth(yearNum, monthNum);
-    const mondaysInMonth = getMondaysInMonth(yearNum, monthNum);
-    const requiredWorkingDays = totalDaysInMonth - mondaysInMonth;
+    const sundaysInMonth = getSundaysInMonth(yearNum, monthNum);
+    const requiredWorkingDays = totalDaysInMonth - sundaysInMonth;
 
     const previews = await Promise.all(
       employees.map(async employee => {
@@ -269,7 +269,7 @@ export class PayrollController {
       year: yearNum,
       month: monthNum,
       totalDays: totalDaysInMonth,
-      mondaysInMonth,
+      sundaysInMonth,
       requiredWorkingDays,
       employees: previews,
       totalPayroll: previews.reduce((sum, p) => sum + p.netSalary, 0),

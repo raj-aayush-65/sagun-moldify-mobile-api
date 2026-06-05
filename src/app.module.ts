@@ -10,6 +10,7 @@ import { HealthModule } from './modules/health/health.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { StockModule } from './modules/stock/stock.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
     DashboardModule,
     ExpensesModule,
     AccountsModule,
+    StockModule,
   ],
   controllers: [],
   providers: [],
