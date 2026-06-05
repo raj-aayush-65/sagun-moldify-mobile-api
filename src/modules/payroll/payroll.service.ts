@@ -20,16 +20,16 @@ import { PayrollIntegrationService } from '../expenses/payroll-integration.servi
 const DEFAULT_OVERTIME_MULTIPLIER = 1.5;
 const SALARY_DAYS = 30; // Fixed divisor as per user requirement
 
-// Helper function to calculate Mondays in a month
-function getMondaysInMonth(year: number, month: number): number {
+// Helper function to calculate Sundays (holidays) in a month
+function getSundaysInMonth(year: number, month: number): number {
   const daysInMonth = new Date(year, month, 0).getDate();
-  let mondays = 0;
+  let sundays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
-    if (new Date(year, month - 1, d).getDay() === 1) {
-      mondays++;
+    if (new Date(year, month - 1, d).getDay() === 0) {
+      sundays++;
     }
   }
-  return mondays;
+  return sundays;
 }
 
 // Helper to get total days in month
@@ -205,16 +205,16 @@ export class PayrollService {
     // Fixed: Use 30 days as divisor for deduction calculation
     const dailyRate = monthlySalary / SALARY_DAYS;
 
-    // Get actual days in the month and Mondays
+    // Get actual days in the month and Sundays (holidays)
     const totalDaysInMonth = getDaysInMonth(year, month);
-    const mondaysInMonth = getMondaysInMonth(year, month);
+    const sundaysInMonth = getSundaysInMonth(year, month);
 
-    // Required shifts = Total days - Mondays (Mondays are holidays)
+    // Required shifts = Total days - Sundays (Sundays are holidays)
     // Employee works required shifts to get full salary
-    const requiredShifts = totalDaysInMonth - mondaysInMonth;
+    const requiredShifts = totalDaysInMonth - sundaysInMonth;
 
     // Count ALL attendance records as shifts worked
-    // PRESENT, WORKING (Monday holiday worked), and HOLIDAY (company holiday) count as full shift (1.0)
+    // PRESENT, WORKING (Sunday holiday worked), and HOLIDAY (company holiday) count as full shift (1.0)
     // HALF_DAY counts as half shift (0.5)
     const fullDayShifts = attendance.filter(
       a =>
