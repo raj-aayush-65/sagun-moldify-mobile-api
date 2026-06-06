@@ -115,10 +115,70 @@ export class AttendanceService {
           continue;
         }
 
-        const attendance = await this.create(record, userId);
-        results.push(attendance);
+        // Check if attendance already exists for this employee, date, AND shift
+        const existingAttendance = await this.attendanceRepository.findOne({
+          where: {
+            employeeId: record.employeeId,
+            attendanceDate: new Date(record.attendanceDate),
+            shift: record.shift || ShiftType.DAY_SHIFT,
+          },
+        });
+
+        if (existingAttendance) {
+          // Update the existing record instead of skipping
+          const updateData: Partial<Attendance> = {};
+
+          if (record.status !== undefined) {
+            updateData.status = record.status;
+          }
+          if (record.shift !== undefined) {
+            updateData.shift = record.shift;
+          }
+          if (record.isHolidayWorked !== undefined) {
+            updateData.isHolidayWorked = record.isHolidayWorked;
+          }
+          if (record.overtimeMultiplier !== undefined) {
+            updateData.overtimeMultiplier = record.overtimeMultiplier;
+          }
+          if (record.balanceDate !== undefined) {
+            updateData.balanceDate = new Date(record.balanceDate);
+          }
+          if (record.perVisitRate !== undefined) {
+            updateData.perVisitRate = record.perVisitRate;
+          }
+          if (record.perCupRate !== undefined) {
+            updateData.perCupRate = record.perCupRate;
+          }
+          if (record.cupsCount !== undefined) {
+            updateData.cupsCount = record.cupsCount;
+          }
+          if (record.cupsUnit !== undefined) {
+            updateData.cupsUnit = record.cupsUnit;
+          }
+          if (record.cupsRate !== undefined) {
+            updateData.cupsRate = record.cupsRate;
+          }
+          if (record.cupsRateUnit !== undefined) {
+            updateData.cupsRateUnit = record.cupsRateUnit;
+          }
+
+          // Handle Sunday auto-set logic
+          const dayOfWeek = new Date(record.attendanceDate).getDay();
+          if (dayOfWeek === 0 && record.status === AttendanceStatus.PRESENT) {
+            updateData.status = AttendanceStatus.WORKING;
+            updateData.isHolidayWorked = true;
+          }
+
+          Object.assign(existingAttendance, updateData);
+          const updated = await this.attendanceRepository.save(existingAttendance);
+          results.push(updated);
+        } else {
+          // Create new attendance record
+          const attendance = await this.create(record, userId);
+          results.push(attendance);
+        }
       } catch (error) {
-        // Skip if already exists, continue with others
+        // Skip if there's a BadRequestException for other reasons, continue with others
         if (error instanceof BadRequestException) {
           continue;
         }
