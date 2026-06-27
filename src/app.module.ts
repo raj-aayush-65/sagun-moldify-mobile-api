@@ -11,6 +11,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { StockModule } from './modules/stock/stock.module';
+import { SalesModule } from './modules/sales/sales.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { StockModule } from './modules/stock/stock.module';
     ExpensesModule,
     AccountsModule,
     StockModule,
+    SalesModule,
   ],
   controllers: [],
   providers: [],
