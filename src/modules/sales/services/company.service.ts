@@ -63,7 +63,7 @@ export class CompanyService {
     const qb = this.companyRepo.createQueryBuilder('c');
 
     if (isActive !== undefined) {
-      qb.where('c.is_active = :isActive', { isActive });
+      qb.where('c.isActive = :isActive', { isActive });
     }
 
     qb.orderBy('c.name', 'ASC');

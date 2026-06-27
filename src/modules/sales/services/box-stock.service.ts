@@ -48,10 +48,10 @@ export class BoxStockService {
     const qb = this.stockEntryRepo
       .createQueryBuilder('se')
       .leftJoinAndSelect('se.boxVariant', 'bv')
-      .orderBy('se.entry_date', 'DESC');
+      .orderBy('se.entryDate', 'DESC');
 
     if (boxVariantId) {
-      qb.where('se.box_variant_id = :boxVariantId', { boxVariantId });
+      qb.where('se.boxVariantId = :boxVariantId', { boxVariantId });
     }
 
     return qb.getMany();
@@ -79,18 +79,18 @@ export class BoxStockService {
       const addedResult = await this.stockEntryRepo
         .createQueryBuilder('se')
         .select('COALESCE(SUM(se.quantity), 0)', 'total')
-        .where('se.box_variant_id = :variantId', { variantId: variant.id })
+        .where('se.boxVariantId = :variantId', { variantId: variant.id })
         .getRawOne();
 
       // Total sold
       const soldResult = await this.saleItemRepo
         .createQueryBuilder('si')
         .select('COALESCE(SUM(si.quantity), 0)', 'total')
-        .where('si.box_variant_id = :variantId', { variantId: variant.id })
+        .where('si.boxVariantId = :variantId', { variantId: variant.id })
         .getRawOne();
 
-      const totalAdded = parseInt(addedResult.total, 10);
-      const totalSold = parseInt(soldResult.total, 10);
+      const totalAdded = parseInt(addedResult?.total || '0', 10);
+      const totalSold = parseInt(soldResult?.total || '0', 10);
 
       levels.push({
         boxVariantId: variant.id,
@@ -109,15 +109,15 @@ export class BoxStockService {
     const addedResult = await this.stockEntryRepo
       .createQueryBuilder('se')
       .select('COALESCE(SUM(se.quantity), 0)', 'total')
-      .where('se.box_variant_id = :boxVariantId', { boxVariantId })
+      .where('se.boxVariantId = :boxVariantId', { boxVariantId })
       .getRawOne();
 
     const soldResult = await this.saleItemRepo
       .createQueryBuilder('si')
       .select('COALESCE(SUM(si.quantity), 0)', 'total')
-      .where('si.box_variant_id = :boxVariantId', { boxVariantId })
+      .where('si.boxVariantId = :boxVariantId', { boxVariantId })
       .getRawOne();
 
-    return parseInt(addedResult.total, 10) - parseInt(soldResult.total, 10);
+    return parseInt(addedResult?.total || '0', 10) - parseInt(soldResult?.total || '0', 10);
   }
 }

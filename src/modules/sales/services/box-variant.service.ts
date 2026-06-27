@@ -70,7 +70,7 @@ export class BoxVariantService {
     const qb = this.boxVariantRepo.createQueryBuilder('bv');
 
     if (isActive !== undefined) {
-      qb.where('bv.is_active = :isActive', { isActive });
+      qb.where('bv.isActive = :isActive', { isActive });
     }
 
     qb.orderBy('bv.name', 'ASC');

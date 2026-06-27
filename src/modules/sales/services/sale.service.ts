@@ -141,25 +141,25 @@ export class SaleService {
       .leftJoinAndSelect('items.boxVariant', 'boxVariant');
 
     if (filters?.companyId) {
-      qb.andWhere('sale.company_id = :companyId', { companyId: filters.companyId });
+      qb.andWhere('sale.companyId = :companyId', { companyId: filters.companyId });
     }
 
     if (filters?.paymentStatus) {
-      qb.andWhere('sale.payment_status = :paymentStatus', {
+      qb.andWhere('sale.paymentStatus = :paymentStatus', {
         paymentStatus: filters.paymentStatus,
       });
     }
 
     if (filters?.dateFrom) {
-      qb.andWhere('sale.sale_date >= :dateFrom', { dateFrom: filters.dateFrom });
+      qb.andWhere('sale.saleDate >= :dateFrom', { dateFrom: filters.dateFrom });
     }
 
     if (filters?.dateTo) {
-      qb.andWhere('sale.sale_date <= :dateTo', { dateTo: filters.dateTo });
+      qb.andWhere('sale.saleDate <= :dateTo', { dateTo: filters.dateTo });
     }
 
-    qb.orderBy('sale.sale_date', 'DESC');
-    qb.addOrderBy('sale.created_at', 'DESC');
+    qb.orderBy('sale.saleDate', 'DESC');
+    qb.addOrderBy('sale.createdAt', 'DESC');
     qb.skip((page - 1) * pageSize);
     qb.take(pageSize);
 
@@ -192,7 +192,7 @@ export class SaleService {
     const todayResult = await this.saleRepo
       .createQueryBuilder('sale')
       .select('COUNT(sale.id)', 'count')
-      .where('sale.sale_date = :today', { today })
+      .where('sale.saleDate = :today', { today })
       .getRawOne();
 
     // Today's boxes sold
@@ -200,15 +200,15 @@ export class SaleService {
       .createQueryBuilder('si')
       .innerJoin('si.sale', 'sale')
       .select('COALESCE(SUM(si.quantity), 0)', 'total')
-      .where('sale.sale_date = :today', { today })
+      .where('sale.saleDate = :today', { today })
       .getRawOne();
 
     // Monthly sales count
     const monthResult = await this.saleRepo
       .createQueryBuilder('sale')
       .select('COUNT(sale.id)', 'count')
-      .where('sale.sale_date >= :firstOfMonth', { firstOfMonth })
-      .andWhere('sale.sale_date <= :today', { today })
+      .where('sale.saleDate >= :firstOfMonth', { firstOfMonth })
+      .andWhere('sale.saleDate <= :today', { today })
       .getRawOne();
 
     // Monthly boxes sold
@@ -216,15 +216,15 @@ export class SaleService {
       .createQueryBuilder('si')
       .innerJoin('si.sale', 'sale')
       .select('COALESCE(SUM(si.quantity), 0)', 'total')
-      .where('sale.sale_date >= :firstOfMonth', { firstOfMonth })
-      .andWhere('sale.sale_date <= :today', { today })
+      .where('sale.saleDate >= :firstOfMonth', { firstOfMonth })
+      .andWhere('sale.saleDate <= :today', { today })
       .getRawOne();
 
     return {
-      todaySales: parseInt(todayResult.count, 10),
-      todayBoxesSold: parseInt(todayBoxesResult.total, 10),
-      monthlySales: parseInt(monthResult.count, 10),
-      monthlyBoxesSold: parseInt(monthBoxesResult.total, 10),
+      todaySales: parseInt(todayResult?.count || '0', 10),
+      todayBoxesSold: parseInt(todayBoxesResult?.total || '0', 10),
+      monthlySales: parseInt(monthResult?.count || '0', 10),
+      monthlyBoxesSold: parseInt(monthBoxesResult?.total || '0', 10),
     };
   }
 }
