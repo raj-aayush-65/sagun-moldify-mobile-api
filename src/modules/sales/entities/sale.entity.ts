@@ -47,7 +47,7 @@ export class Sale {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @OneToMany(() => SaleItem, item => item.sale, { cascade: true, eager: true })
+  @OneToMany(() => SaleItem, item => item.sale, { cascade: true })
   items: SaleItem[];
 
   @Column({ name: 'created_by' })
