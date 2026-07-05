@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { BoxVariant } from './box-variant.entity';
+import { Company } from './company.entity';
 
 @Entity('stock_entry')
 export class StockEntry {
@@ -19,6 +20,13 @@ export class StockEntry {
   @ManyToOne(() => BoxVariant)
   @JoinColumn({ name: 'box_variant_id' })
   boxVariant: BoxVariant;
+
+  @Column({ name: 'company_id', nullable: true })
+  companyId: string;
+
+  @ManyToOne(() => Company, { nullable: true })
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
 
   @Column({ type: 'int' })
   quantity: number;
