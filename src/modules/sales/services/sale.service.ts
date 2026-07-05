@@ -12,8 +12,10 @@ import { BoxStockService } from './box-stock.service';
 export interface SalesSummary {
   todaySales: number;
   todayBoxesSold: number;
+  todayAmount: number;
   monthlySales: number;
   monthlyBoxesSold: number;
+  monthlyAmount: number;
 }
 
 @Injectable()
@@ -192,6 +194,7 @@ export class SaleService {
     const todayResult = await this.saleRepo
       .createQueryBuilder('sale')
       .select('COUNT(sale.id)', 'count')
+      .addSelect('COALESCE(SUM(sale.totalAmount), 0)', 'amount')
       .where('sale.saleDate = :today', { today })
       .getRawOne();
 
@@ -203,10 +206,11 @@ export class SaleService {
       .where('sale.saleDate = :today', { today })
       .getRawOne();
 
-    // Monthly sales count
+    // Monthly sales count + amount
     const monthResult = await this.saleRepo
       .createQueryBuilder('sale')
       .select('COUNT(sale.id)', 'count')
+      .addSelect('COALESCE(SUM(sale.totalAmount), 0)', 'amount')
       .where('sale.saleDate >= :firstOfMonth', { firstOfMonth })
       .andWhere('sale.saleDate <= :today', { today })
       .getRawOne();
@@ -223,8 +227,10 @@ export class SaleService {
     return {
       todaySales: parseInt(todayResult?.count || '0', 10),
       todayBoxesSold: parseInt(todayBoxesResult?.total || '0', 10),
+      todayAmount: parseFloat(todayResult?.amount || '0'),
       monthlySales: parseInt(monthResult?.count || '0', 10),
       monthlyBoxesSold: parseInt(monthBoxesResult?.total || '0', 10),
+      monthlyAmount: parseFloat(monthResult?.amount || '0'),
     };
   }
 }

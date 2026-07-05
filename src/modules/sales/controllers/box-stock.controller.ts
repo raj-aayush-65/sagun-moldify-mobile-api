@@ -31,15 +31,24 @@ export class BoxStockController {
   }
 
   @Get('entries')
-  async getEntries(@Query('boxVariantId') boxVariantId?: string) {
-    const result = await this.boxStockService.getStockEntries(boxVariantId);
+  async getEntries(
+    @Query('boxVariantId') boxVariantId?: string,
+    @Query('companyId') companyId?: string
+  ) {
+    const result = await this.boxStockService.getStockEntries(boxVariantId, companyId);
     return ApiResponseDto.success('Stock entries retrieved', result);
   }
 
   @Get('levels')
-  async getLevels() {
-    const result = await this.boxStockService.getCurrentStockLevels();
+  async getLevels(@Query('companyId') companyId?: string) {
+    const result = await this.boxStockService.getCurrentStockLevels(companyId);
     return ApiResponseDto.success('Stock levels retrieved', result);
+  }
+
+  @Get('levels/by-company')
+  async getLevelsByCompany() {
+    const result = await this.boxStockService.getStockLevelsByCompany();
+    return ApiResponseDto.success('Stock levels by company retrieved', result);
   }
 
   @Delete('entries/:id')

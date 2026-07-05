@@ -4,6 +4,10 @@ export class CreateStockEntryDto {
   @IsUUID()
   boxVariantId: string;
 
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @IsInt()
   @Min(1)
   quantity: number;
