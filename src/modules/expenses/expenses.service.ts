@@ -99,13 +99,16 @@ export class ExpensesService {
     // Validate category
     const category = this.resolveCategory(input.expenseType, input.category);
 
-    // Validate employee for EMPLOYEE_ADVANCE
-    if (input.expenseType === ExpenseType.EMPLOYEE_ADVANCE) {
+    // Validate employee for EMPLOYEE_ADVANCE or EMPLOYEE_OVERTIME
+    if (
+      input.expenseType === ExpenseType.EMPLOYEE_ADVANCE ||
+      input.expenseType === ExpenseType.EMPLOYEE_OVERTIME
+    ) {
       if (!input.employeeId) {
         throw new HttpException(
           {
             status: 'error',
-            message: 'Employee ID is required for Employee Advance expenses',
+            message: 'Employee ID is required for Employee Advance/Overtime expenses',
             data: { code: 'EMPLOYEE_REQUIRED_FOR_ADVANCE' },
           },
           HttpStatus.BAD_REQUEST
@@ -897,6 +900,13 @@ export class ExpensesService {
     if (expenseType === ExpenseType.EMPLOYEE_ADVANCE) {
       if (!category) {
         return ExpenseCategory.SALARY_ADVANCE;
+      }
+    }
+
+    // EMPLOYEE_OVERTIME auto-sets category to MISC if not provided
+    if (expenseType === ExpenseType.EMPLOYEE_OVERTIME) {
+      if (!category) {
+        return ExpenseCategory.MISC;
       }
     }
 
